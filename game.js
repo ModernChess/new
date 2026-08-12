@@ -40,7 +40,7 @@ const progressText = document.getElementById('progressText');
 
 // Asset list to track via Fetch API for accurate download progress
 const assetUrls = [
-    ghBase + 'map1.png',
+    ghBase + 'map2.png',
     ghBase + 'blue_tank.jpg',
     ghBase + 'blue_infantry.jpg',
     ghBase + 'blue_artillery.jpg',
