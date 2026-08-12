@@ -11,7 +11,42 @@ function lerp(start, end, t) {
 
 const ghBase = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/';
 
-// Create and inject a sleek Loading Screen overlay dynamically into the DOM
+// 1. CREATE PROFESSIONAL SPLASH SCREEN (Logo Reveal)
+const splashOverlay = document.createElement('div');
+splashOverlay.style.position = 'fixed';
+splashOverlay.style.top = '0';
+splashOverlay.style.left = '0';
+splashOverlay.style.width = '100vw';
+splashOverlay.style.height = '100vh';
+splashOverlay.style.backgroundColor = '#0d0d0d';
+splashOverlay.style.zIndex = '10000';
+splashOverlay.style.display = 'flex';
+splashOverlay.style.flexDirection = 'column';
+splashOverlay.style.justifyContent = 'center';
+splashOverlay.style.alignItems = 'center';
+splashOverlay.style.opacity = '1';
+splashOverlay.style.transition = 'opacity 0.6s ease';
+
+// Logo element with professional styling and fade-in pulse effect
+const splashLogo = document.createElement('img');
+splashLogo.src = ghBase + 'logo.png';
+splashLogo.style.width = '160px';
+splashLogo.style.height = '160px';
+splashLogo.style.objectFit = 'contain';
+splashLogo.style.borderRadius = '24px';
+splashLogo.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+splashLogo.style.transform = 'scale(0.95)';
+splashLogo.style.transition = 'transform 1.5s ease, opacity 1s ease';
+
+splashOverlay.appendChild(splashLogo);
+document.body.appendChild(splashOverlay);
+
+// Trigger smooth logo entrance animation
+setTimeout(() => {
+    splashLogo.style.transform = 'scale(1)';
+}, 50);
+
+// 2. CREATE LOADING SCREEN OVERLAY (Appears after splash screen completes)
 const loadingOverlay = document.createElement('div');
 loadingOverlay.style.position = 'fixed';
 loadingOverlay.style.top = '0';
@@ -26,6 +61,9 @@ loadingOverlay.style.justifyContent = 'center';
 loadingOverlay.style.alignItems = 'center';
 loadingOverlay.style.color = '#ffffff';
 loadingOverlay.style.fontFamily = 'sans-serif';
+loadingOverlay.style.opacity = '0';
+loadingOverlay.style.pointerEvents = 'none';
+loadingOverlay.style.transition = 'opacity 0.4s ease';
 loadingOverlay.innerHTML = `
     <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
     <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
@@ -38,9 +76,8 @@ document.body.appendChild(loadingOverlay);
 const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
-// Asset list to track via Fetch API for accurate download progress
 const assetUrls = [
-    ghBase + 'map2.png',
+    ghBase + 'map1.png',
     ghBase + 'blue_tank.jpg',
     ghBase + 'blue_infantry.jpg',
     ghBase + 'blue_artillery.jpg',
@@ -54,7 +91,6 @@ const assetUrls = [
 let loadedCount = 0;
 const totalAssets = assetUrls.length;
 
-// Image instances used by the game engine loop
 let mapImg = new Image();
 let mapLoaded = false;
 
@@ -77,13 +113,11 @@ function updateLoadingProgress() {
     if (loadedCount >= totalAssets) {
         setTimeout(() => {
             loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.4s ease';
             setTimeout(() => loadingOverlay.remove(), 400);
         }, 300);
     }
 }
 
-// Fetch assets with Blob objects to track true network progress rates
 function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
     fetch(url)
         .then(response => {
@@ -99,29 +133,39 @@ function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
             };
         })
         .catch(err => {
-            // Fallback standard direct assignment if fetch/CORS blocks blob
             imgObj.src = url;
             imgObj.onload = () => {
                 setLoadedFlag(true);
                 updateLoadingProgress();
             };
             imgObj.onerror = () => {
-                // Force progress forward even on network glitch so user doesn't get stuck
                 updateLoadingProgress();
             };
         });
 }
 
-// Initialize loading sequence
-loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
-loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
-loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
-loadAssetWithProgress(assetUrls[3], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
-loadAssetWithProgress(assetUrls[4], blueShipImg, (val) => { blueShipLoaded = val; });
-loadAssetWithProgress(assetUrls[5], redTankImg, (val) => { redTankLoaded = val; });
-loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded = val; });
-loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
-loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
+// 3. SEQUENCE MANAGER: 3-Second Splash Delay -> Fade to Loading Screen -> Fetch Assets
+setTimeout(() => {
+    // Fade out splash screen
+    splashOverlay.style.opacity = '0';
+    setTimeout(() => {
+        splashOverlay.remove();
+        // Activate loading screen view
+        loadingOverlay.style.opacity = '1';
+        loadingOverlay.style.pointerEvents = 'auto';
+
+        // Begin loading assets
+        loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
+        loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
+        loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
+        loadAssetWithProgress(assetUrls[3], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
+        loadAssetWithProgress(assetUrls[4], blueShipImg, (val) => { blueShipLoaded = val; });
+        loadAssetWithProgress(assetUrls[5], redTankImg, (val) => { redTankLoaded = val; });
+        loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded = val; });
+        loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
+        loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
+    }, 600);
+}, 3000);
 
 function getTerrain(c, r) {
     if ((c >= 6 && c <= 8) && (r === 0 || r === 1)) {
