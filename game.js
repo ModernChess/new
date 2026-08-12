@@ -11,52 +11,117 @@ function lerp(start, end, t) {
 
 const ghBase = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/';
 
-// Load Map Image
+// Create and inject a sleek Loading Screen overlay dynamically into the DOM
+const loadingOverlay = document.createElement('div');
+loadingOverlay.style.position = 'fixed';
+loadingOverlay.style.top = '0';
+loadingOverlay.style.left = '0';
+loadingOverlay.style.width = '100vw';
+loadingOverlay.style.height = '100vh';
+loadingOverlay.style.backgroundColor = '#111111';
+loadingOverlay.style.zIndex = '9999';
+loadingOverlay.style.display = 'flex';
+loadingOverlay.style.flexDirection = 'column';
+loadingOverlay.style.justifyContent = 'center';
+loadingOverlay.style.alignItems = 'center';
+loadingOverlay.style.color = '#ffffff';
+loadingOverlay.style.fontFamily = 'sans-serif';
+loadingOverlay.innerHTML = `
+    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
+    <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
+        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
+    </div>
+    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
+`;
+document.body.appendChild(loadingOverlay);
+
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+
+// Asset list to track via Fetch API for accurate download progress
+const assetUrls = [
+    ghBase + 'map1.png',
+    ghBase + 'blue_tank.jpg',
+    ghBase + 'blue_infantry.jpg',
+    ghBase + 'blue_artillery.jpg',
+    ghBase + 'blue_ship.jpg',
+    ghBase + 'red_tank.jpg',
+    ghBase + 'red_infantry.jpg',
+    ghBase + 'red_artillery.jpg',
+    ghBase + 'red_ship.jpg'
+];
+
+let loadedCount = 0;
+const totalAssets = assetUrls.length;
+
+// Image instances used by the game engine loop
 let mapImg = new Image();
 let mapLoaded = false;
-mapImg.src = ghBase + 'map1.png';
-mapImg.onload = function() { mapLoaded = true; };
 
-// Load Unit Images
-let blueTankImg = new Image();
-let blueTankLoaded = false;
-blueTankImg.src = ghBase + 'blue_tank.jpg';
-blueTankImg.onload = function() { blueTankLoaded = true; };
+let blueTankImg = new Image(), blueTankLoaded = false;
+let blueInfantryImg = new Image(), blueInfantryLoaded = false;
+let blueArtilleryImg = new Image(), blueArtilleryLoaded = false;
+let blueShipImg = new Image(), blueShipLoaded = false;
 
-let blueInfantryImg = new Image();
-let blueInfantryLoaded = false;
-blueInfantryImg.src = ghBase + 'blue_infantry.jpg';
-blueInfantryImg.onload = function() { blueInfantryLoaded = true; };
+let redTankImg = new Image(), redTankLoaded = false;
+let redInfantryImg = new Image(), redInfantryLoaded = false;
+let redArtilleryImg = new Image(), redArtilleryLoaded = false;
+let redShipImg = new Image(), redShipLoaded = false;
 
-let blueArtilleryImg = new Image();
-let blueArtilleryLoaded = false;
-blueArtilleryImg.src = ghBase + 'blue_artillery.jpg';
-blueArtilleryImg.onload = function() { blueArtilleryLoaded = true; };
+function updateLoadingProgress() {
+    loadedCount++;
+    let percent = Math.floor((loadedCount / totalAssets) * 100);
+    progressBar.style.width = percent + '%';
+    progressText.innerText = percent + '%';
 
-let blueShipImg = new Image();
-let blueShipLoaded = false;
-blueShipImg.src = ghBase + 'blue_ship.jpg';
-blueShipImg.onload = function() { blueShipLoaded = true; };
+    if (loadedCount >= totalAssets) {
+        setTimeout(() => {
+            loadingOverlay.style.opacity = '0';
+            loadingOverlay.style.transition = 'opacity 0.4s ease';
+            setTimeout(() => loadingOverlay.remove(), 400);
+        }, 300);
+    }
+}
 
-let redTankImg = new Image();
-let redTankLoaded = false;
-redTankImg.src = ghBase + 'red_tank.jpg';
-redTankImg.onload = function() { redTankLoaded = true; };
+// Fetch assets with Blob objects to track true network progress rates
+function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
+    fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.blob();
+        })
+        .then(blob => {
+            let objectURL = URL.createObjectURL(blob);
+            imgObj.src = objectURL;
+            imgObj.onload = () => {
+                setLoadedFlag(true);
+                updateLoadingProgress();
+            };
+        })
+        .catch(err => {
+            // Fallback standard direct assignment if fetch/CORS blocks blob
+            imgObj.src = url;
+            imgObj.onload = () => {
+                setLoadedFlag(true);
+                updateLoadingProgress();
+            };
+            imgObj.onerror = () => {
+                // Force progress forward even on network glitch so user doesn't get stuck
+                updateLoadingProgress();
+            };
+        });
+}
 
-let redInfantryImg = new Image();
-let redInfantryLoaded = false;
-redInfantryImg.src = ghBase + 'red_infantry.jpg';
-redInfantryImg.onload = function() { redInfantryLoaded = true; };
-
-let redArtilleryImg = new Image();
-let redArtilleryLoaded = false;
-redArtilleryImg.src = ghBase + 'red_artillery.jpg';
-redArtilleryImg.onload = function() { redArtilleryLoaded = true; };
-
-let redShipImg = new Image();
-let redShipLoaded = false;
-redShipImg.src = ghBase + 'red_ship.jpg';
-redShipImg.onload = function() { redShipLoaded = true; };
+// Initialize loading sequence
+loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
+loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
+loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[3], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[4], blueShipImg, (val) => { blueShipLoaded = val; });
+loadAssetWithProgress(assetUrls[5], redTankImg, (val) => { redTankLoaded = val; });
+loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
 
 function getTerrain(c, r) {
     if ((c >= 6 && c <= 8) && (r === 0 || r === 1)) {
