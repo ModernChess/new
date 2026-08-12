@@ -84,6 +84,21 @@
             padding-right: 40px;
         }
 
+        /* Version Badge Label */
+        .version-badge {
+            background: #222;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: bold;
+            align-self: center;
+            margin-top: auto;
+            margin-bottom: 8px;
+            cursor: default;
+        }
+
         /* Content Body & Lists */
         .screen-body {
             padding: 20px;
@@ -265,6 +280,9 @@
             <button class="menu-btn" onclick="navigateTo('manual-main-screen')">How to Play</button>
             <button class="menu-btn" onclick="navigateTo('files-manager-screen')">Files Manager</button>
             <button class="menu-btn" onclick="navigateTo('settings-screen')">Settings</button>
+            
+            <!-- Version Badge Label -->
+            <div class="version-badge">v1.228</div>
         </div>
     </div>
 
