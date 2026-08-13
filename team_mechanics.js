@@ -129,10 +129,10 @@ function drawTeamUIAndFlags() {
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
-        // Significantly taller vertical stretch (height = cellSize * 2.5, shifted far upwards)
-        let targetY = py - cellSize * 1.5;
+        // Adjusted height (30% lower than before: height = cellSize * 1.75)
+        let targetY = py - cellSize * 0.9;
         let flagWidth = cellSize;
-        let flagHeight = cellSize * 2.5;
+        let flagHeight = cellSize * 1.75;
 
         let anim = flagAnimations[core.id];
         let renderY = targetY;
@@ -143,9 +143,9 @@ function drawTeamUIAndFlags() {
             
             if (elapsed < duration) {
                 let progress = elapsed / duration;
-                // Smooth cosine drop-in animation from further above
-                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 2);
-                renderY = targetY - (cellSize * 2) + dropOffset;
+                // Smooth cosine drop-in animation from above
+                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
+                renderY = targetY - (cellSize * 1.5) + dropOffset;
             }
         }
 
