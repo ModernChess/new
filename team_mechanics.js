@@ -1,5 +1,5 @@
 // --- TEAM & TURN STATE ---
-let currentTurn = 'blue'; // 'blue' or 'red' (or black/white mapped appropriately)
+let currentTurn = 'blue'; // 'blue' or 'red'
 let blueCoins = 0;
 let redCoins = 0;
 
@@ -76,7 +76,7 @@ function getUnitPower(unit) {
     let name = (unit.name || '').toLowerCase();
     if (name.includes('tank')) return 2;
     if (name.includes('infantry') || name.includes('soldier')) return 1;
-    return 1; // default fallback
+    return 1; 
 }
 
 // Helper: Check if two units are touching orthogonally or diagonally (connected)
@@ -95,7 +95,6 @@ function getSuperunitsForTeam(teamName, allUnits) {
     teamUnits.forEach(unit => {
         if (visited.has(unit)) return;
 
-        // Breadth-First Search to find all connected friendly units (orthogonal or diagonal)
         let group = [];
         let queue = [unit];
         visited.add(unit);
@@ -148,37 +147,43 @@ function checkAndCaptureGold(unit, c, r) {
     });
 }
 
-// Combat & Movement Execution Rule with Superunit Power Resolution
+// Combat Resolution: Pure Power Comparison
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     if (unitTeam !== currentTurn) return false; 
 
     if (isGoldCoreCenter(newC, newR)) return false; 
 
-    // Check if target tile has an enemy unit (Combat Initiation)
+    // Check if target tile has an enemy unit
     let enemyUnit = units.find(u => u.gridX === newC && u.gridY === newR && getTeamFromUnit(u) !== unitTeam);
 
     if (enemyUnit) {
-        // Calculate Attacker's Superunit Power (including connected allies)
+        // Calculate Attacking Superunit Power
         let attackerSuperunits = getSuperunitsForTeam(unitTeam, units);
         let attackingGroup = attackerSuperunits.find(su => su.units.includes(unit));
         let attackingPower = attackingGroup ? attackingGroup.power : getUnitPower(unit);
 
-        // Calculate Defender's Superunit Power (including connected enemy allies)
+        // Calculate Defending Superunit Power
         let defenderTeam = getTeamFromUnit(enemyUnit);
         let defenderSuperunits = getSuperunitsForTeam(defenderTeam, units);
         let defendingGroup = defenderSuperunits.find(su => su.units.includes(enemyUnit));
         let defendingPower = defendingGroup ? defendingGroup.power : getUnitPower(enemyUnit);
 
-        console.log(`⚔️ COMBAT: Attacking Power (${attackingPower}) vs Defending Power (${defendingPower})`);
+        console.log(`⚔️ COMBAT: Attacker Power (${attackingPower}) vs Defender Power (${defendingPower})`);
 
         if (attackingPower > defendingPower) {
-            // Attacker destroys defender! Remove enemy unit from board.
+            // Attacker is stronger -> Enemy unit is instantly destroyed!
             units = units.filter(u => u !== enemyUnit);
-            console.log(`💥 Defender destroyed!`);
+            console.log(`💥 Defender destroyed due to lower power!`);
+        } else if (attackingPower < defendingPower) {
+            // Attacker is weaker -> Attacking unit gets instantly destroyed!
+            units = units.filter(u => u !== unit);
+            console.log(`💥 Attacker destroyed due to lower power!`);
+            currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
+            return false;
         } else {
-            // Equal or lesser power results in deadlock / stalemate block!
-            console.log(`🛡️ DEADLOCK / STALEMATE: Attack blocked due to equal or superior defense power.`);
+            // Powers are equal -> Deadlock / Stalemate (neither moves or dies)
+            console.log(`🛡️ DEADLOCK / STALEMATE: Equal power blocks action.`);
             return false;
         }
     }
@@ -237,14 +242,12 @@ function drawTeamUIAndFlags() {
         let superunits = getSuperunitsForTeam(team, units);
         superunits.forEach(su => {
             if (su.units.length > 1) {
-                // Find the center position of the superunit cluster to place the power label
                 let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
                 let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
                 ctx.save();
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)ताई'; // background pill
                 ctx.font = 'bold 12px sans-serif';
-                ctx.fillStyle = '#ff3333'; // Red power label text matching your reference photos
+                ctx.fillStyle = '#ff3333'; 
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2;
                 
