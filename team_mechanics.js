@@ -1,10 +1,10 @@
 // --- TEAM & TURN STATE ---
-let currentTurn = 'blue'; // 'blue' or 'red'
+let currentTurn = 'blue'; // 'blue' or 'red' (or black/white mapped appropriately)
 let blueCoins = 0;
 let redCoins = 0;
 
 // Track animation timestamps for newly captured flags
-let flagAnimations = {}; // key: core.id, value: { startTime, team }
+let flagAnimations = {}; 
 
 // Precise Gold Cores and their strict Excel-mapped capture zones (g tiles)
 let goldCores = [
@@ -56,17 +56,67 @@ function getTeamFromUnit(unit) {
     }
     if (unit.name) {
         let name = unit.name.toLowerCase();
-        if (name.includes('red')) { unit._assignedTeam = 'red'; return 'red'; }
-        if (name.includes('blue')) { unit._assignedTeam = 'blue'; return 'blue'; }
+        if (name.includes('red') || name.includes('black')) { unit._assignedTeam = 'red'; return 'red'; }
+        if (name.includes('blue') || name.includes('white')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     if (unit.img && unit.img.src) {
         let src = unit.img.src.toLowerCase();
-        if (src.includes('red')) { unit._assignedTeam = 'red'; return 'red'; }
-        if (src.includes('blue')) { unit._assignedTeam = 'blue'; return 'blue'; }
+        if (src.includes('red') || src.includes('black')) { unit._assignedTeam = 'red'; return 'red'; }
+        if (src.includes('blue') || src.includes('white')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     
     unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue';
     return unit._assignedTeam;
+}
+
+// Get intrinsic power of a unit: Infantry = 1, Tank = 2 (others default to 1)
+function getUnitPower(unit) {
+    if (!unit) return 0;
+    if (unit.power !== undefined) return unit.power;
+    let name = (unit.name || '').toLowerCase();
+    if (name.includes('tank')) return 2;
+    if (name.includes('infantry') || name.includes('soldier')) return 1;
+    return 1; // default fallback
+}
+
+// Helper: Check if two units are touching orthogonally or diagonally (connected)
+function areUnitsConnected(u1, u2) {
+    let dx = Math.abs(u1.gridX - u2.gridX);
+    let dy = Math.abs(u1.gridY - u2.gridY);
+    return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
+}
+
+// Calculate Superunit groups and total power for a given team
+function getSuperunitsForTeam(teamName, allUnits) {
+    let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
+    let visited = new Set();
+    let superunits = [];
+
+    teamUnits.forEach(unit => {
+        if (visited.has(unit)) return;
+
+        // Breadth-First Search to find all connected friendly units (orthogonal or diagonal)
+        let group = [];
+        let queue = [unit];
+        visited.add(unit);
+
+        while (queue.length > 0) {
+            let curr = queue.shift();
+            group.push(curr);
+
+            teamUnits.forEach(other => {
+                if (!visited.has(other) && areUnitsConnected(curr, other)) {
+                    visited.add(other);
+                    queue.push(other);
+                }
+            });
+        }
+
+        let totalPower = group.reduce((sum, u) => sum + getUnitPower(u), 0);
+        superunits.push({ units: group, power: totalPower });
+    });
+
+    return superunits;
 }
 
 // Check if a tile is the exact center core coordinate
@@ -74,7 +124,7 @@ function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
-// Check capture and trigger smooth planting animation
+// Check capture
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
@@ -87,49 +137,75 @@ function checkAndCaptureGold(unit, c, r) {
         
         if (matches && core.owner !== team) {
             core.owner = team;
-            // Trigger animation start time
             flagAnimations[core.id] = { startTime: performance.now(), team: team };
 
             if (team === 'blue') {
                 blueCoins += 1;
-                console.log(`💰 BLUE captured Gold Core ${core.id}! Blue Coins: ${blueCoins}`);
             } else {
                 redCoins += 1;
-                console.log(`💰 RED captured Gold Core ${core.id}! Red Coins: ${redCoins}`);
             }
         }
     });
 }
 
+// Combat & Movement Execution Rule with Superunit Power Resolution
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
-    if (unitTeam !== currentTurn) {
-        return false; 
+    if (unitTeam !== currentTurn) return false; 
+
+    if (isGoldCoreCenter(newC, newR)) return false; 
+
+    // Check if target tile has an enemy unit (Combat Initiation)
+    let enemyUnit = units.find(u => u.gridX === newC && u.gridY === newR && getTeamFromUnit(u) !== unitTeam);
+
+    if (enemyUnit) {
+        // Calculate Attacker's Superunit Power (including connected allies)
+        let attackerSuperunits = getSuperunitsForTeam(unitTeam, units);
+        let attackingGroup = attackerSuperunits.find(su => su.units.includes(unit));
+        let attackingPower = attackingGroup ? attackingGroup.power : getUnitPower(unit);
+
+        // Calculate Defender's Superunit Power (including connected enemy allies)
+        let defenderTeam = getTeamFromUnit(enemyUnit);
+        let defenderSuperunits = getSuperunitsForTeam(defenderTeam, units);
+        let defendingGroup = defenderSuperunits.find(su => su.units.includes(enemyUnit));
+        let defendingPower = defendingGroup ? defendingGroup.power : getUnitPower(enemyUnit);
+
+        console.log(`⚔️ COMBAT: Attacking Power (${attackingPower}) vs Defending Power (${defendingPower})`);
+
+        if (attackingPower > defendingPower) {
+            // Attacker destroys defender! Remove enemy unit from board.
+            units = units.filter(u => u !== enemyUnit);
+            console.log(`💥 Defender destroyed!`);
+        } else {
+            // Equal or lesser power results in deadlock / stalemate block!
+            console.log(`🛡️ DEADLOCK / STALEMATE: Attack blocked due to equal or superior defense power.`);
+            return false;
+        }
     }
 
-    if (isGoldCoreCenter(newC, newR)) {
-        return false; 
-    }
-
+    // Execute Move
     unit.gridX = newC;
     unit.gridY = newR;
 
+    // Evaluate gold capture
     checkAndCaptureGold(unit, newC, newR);
 
+    // Switch Turn
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
     return true;
 }
 
+// Render UI, Flags, and Floating Superunit Power Labels
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
 
+    // Draw Gold Core Flags
     goldCores.forEach(core => {
         if (!core.owner) return;
 
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
-        // Adjusted height (30% lower than before: height = cellSize * 1.75)
         let targetY = py - cellSize * 0.9;
         let flagWidth = cellSize;
         let flagHeight = cellSize * 1.75;
@@ -139,11 +215,10 @@ function drawTeamUIAndFlags() {
 
         if (anim && anim.team === core.owner) {
             let elapsed = currentTime - anim.startTime;
-            let duration = 500; // Animation duration in milliseconds (0.5s)
+            let duration = 500; 
             
             if (elapsed < duration) {
                 let progress = elapsed / duration;
-                // Smooth cosine drop-in animation from above
                 let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
                 renderY = targetY - (cellSize * 1.5) + dropOffset;
             }
@@ -155,6 +230,30 @@ function drawTeamUIAndFlags() {
         if (flagImgToDraw) {
             ctx.drawImage(flagImgToDraw, px, renderY, flagWidth, flagHeight);
         }
+    });
+
+    // Calculate and draw Superunit Power Labels on the canvas
+    ['blue', 'red'].forEach(team => {
+        let superunits = getSuperunitsForTeam(team, units);
+        superunits.forEach(su => {
+            if (su.units.length > 1) {
+                // Find the center position of the superunit cluster to place the power label
+                let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
+                let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)ताई'; // background pill
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillStyle = '#ff3333'; // Red power label text matching your reference photos
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                
+                let label = `Power: ${su.power}`;
+                ctx.strokeText(label, avgX + cellSize * 0.2, avgY - 4);
+                ctx.fillText(label, avgX + cellSize * 0.2, avgY - 4);
+                ctx.restore();
+            }
+        });
     });
 
     // Draw HUD Box
