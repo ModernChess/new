@@ -16,7 +16,7 @@ function getLargerCoord(c, r) {
     return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
-// Function to calculate Ship (1 square range) or Artillery (3 square range) larger grid range
+// Function to calculate Ship (1 square range) or Artillery (3 square rays like a Queen)
 function getUnitCombatRange(unit) {
     let maxDist = (unit.name === 'Ship') ? 1 : (unit.name === 'Artillery' ? 3 : 0);
     if (maxDist === 0) return [];
@@ -24,16 +24,19 @@ function getUnitCombatRange(unit) {
     let currentLg = getLargerCoord(unit.gridX, unit.gridY);
     let results = [];
 
-    const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
-    const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
+    // 8 directions (Queen-like ray casting)
+    let directions = [
+        {dx: 0, dy: -1}, {dx: 0, dy: 1},  // Up, Down
+        {dx: -1, dy: 0}, {dx: 1, dy: 0},  // Left, Right
+        {dx: -1, dy: -1}, {dx: 1, dy: -1}, // Diagonals up-left, up-right
+        {dx: -1, dy: 1}, {dx: 1, dy: 1}   // Diagonals down-left, down-right
+    ];
 
-    for (let dc = -maxDist; dc <= maxDist; dc++) {
-        for (let dr = -maxDist; dr <= maxDist; dr++) {
-            if (dc === 0 && dr === 0) continue;
-            let nc = currentLg.colIdx + dc;
-            let nr = currentLg.rowIdx + dr;
+    directions.forEach(dir => {
+        for (let step = 1; step <= maxDist; step++) {
+            let nc = currentLg.colIdx + (dir.dx * step);
+            let nr = currentLg.rowIdx + (dir.dy * step);
             if (nc >= 0 && nc < 9 && nr >= 0 && nr < 9) {
-                // Each larger square spans a 2x2 area on the 18x18 board
                 results.push({
                     startC: nc * 2,
                     startR: nr * 2,
@@ -42,7 +45,8 @@ function getUnitCombatRange(unit) {
                 });
             }
         }
-    }
+    });
+
     return results;
 }
 
@@ -91,9 +95,9 @@ canvas.addEventListener('pointerdown', (e) => {
     let touchX = (e.clientX - rect.left) * scaleX;
     let touchY = (e.clientY - rect.top) * scaleY;
 
-    // Check if clicking the 'X' close button when range mode is active
+    // Check if clicking the large 'X' close button when range mode is active
     if (rangeMode) {
-        if (touchX >= canvas.width - 45 && touchX <= canvas.width - 10 && touchY >= 10 && touchY <= 45) {
+        if (touchX >= canvas.width - 60 && touchX <= canvas.width - 15 && touchY >= 15 && touchY <= 60) {
             rangeMode = false;
             rangeSquares = [];
             return;
@@ -114,11 +118,12 @@ canvas.addEventListener('pointerdown', (e) => {
                 rangeMode = false; 
             }, 500); 
         } else {
-            // Check if clicking the small red button beside a Ship or Artillery
+            // Check if clicking the large external red button beside a Ship or Artillery
             if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
-                let btnX = selectedUnit.renderX + cellSize - 14;
-                let btnY = selectedUnit.renderY - 4;
-                if (touchX >= btnX && touchX <= btnX + 18 && touchY >= btnY && touchY <= btnY + 18) {
+                let btnX = selectedUnit.renderX + cellSize + 4;
+                let btnY = selectedUnit.renderY;
+                let btnSize = cellSize * 0.75;
+                if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
                     rangeMode = true;
                     rangeSquares = getUnitCombatRange(selectedUnit);
                     return;
@@ -173,11 +178,11 @@ function update() {
         ctx.fill();
     });
 
-    // Render Selection, Movement Outlines, or Bright Purple Range Outlines
+    // Render Selection, Movement Outlines, or White Range Outlines
     if (selectedUnit) {
         if (rangeMode) {
-            ctx.strokeStyle = '#9b59b6'; // Bright purple range outline
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#ffffff'; // White outline for range
+            ctx.lineWidth = 3.5;
             rangeSquares.forEach(sq => {
                 let px = sq.startC * cellSize;
                 let py = sq.startR * cellSize;
@@ -186,12 +191,15 @@ function update() {
                 ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
             });
 
-            // Draw 'X' Close Button on canvas
+            // Draw large comfortable 'X' Close Button on canvas
             ctx.fillStyle = '#e74c3c';
-            ctx.fillRect(canvas.width - 45, 10, 35, 35);
+            ctx.fillRect(canvas.width - 60, 15, 45, 45);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(canvas.width - 60, 15, 45, 45);
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.fillText('X', canvas.width - 32, 35);
+            ctx.font = 'bold 24px sans-serif';
+            ctx.fillText('X', canvas.width - 43, 47);
 
         } else {
             ctx.strokeStyle = '#ff8000';
@@ -204,14 +212,23 @@ function update() {
             ctx.lineWidth = 4;
             ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
 
-            // Draw small red button on Ship or Artillery when selected
+            // Draw large comfortable red action button outside/beside the unit
             if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
+                let btnX = selectedUnit.renderX + cellSize + 4;
+                let btnY = selectedUnit.renderY;
+                let btnSize = cellSize * 0.75;
+                
                 ctx.fillStyle = '#e74c3c';
-                ctx.beginPath();
-                ctx.arc(selectedUnit.renderX + cellSize - 8, selectedUnit.renderY + 8, 8, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(btnX, btnY, btnSize, btnSize);
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(btnX, btnY, btnSize, btnSize);
+
+                // Draw target crosshair icon inside the button
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
                 ctx.stroke();
             }
         }
