@@ -3,14 +3,32 @@ let currentTurn = 'blue'; // 'blue' or 'red'
 let blueCoins = 0;
 let redCoins = 0;
 
-// Gold Cores mapping on the 18x18 grid
+// Precise Gold Cores and their Excel-mapped capture zones (g tiles)
 let goldCores = [
-    { c: 4, r: 4, owner: null },
-    { c: 13, r: 5, owner: null },
-    { c: 8, r: 7, owner: null },
-    { c: 9, r: 10, owner: null },
-    { c: 4, r: 14, owner: null },
-    { c: 14, r: 16, owner: null }
+    {
+        id: 'gc1', c: 12, r: 7, owner: null,
+        captureZones: [{c:11, r:6}, {c:12, r:6}, {c:13, r:6}, {c:11, r:7}, {c:13, r:7}, {c:12, r:8}, {c:13, r:8}]
+    },
+    {
+        id: 'gc2', c: 16, r: 12, owner: null,
+        captureZones: [{c:15, r:11}, {c:16, r:11}, {c:17, r:11}, {c:15, r:12}, {c:17, r:12}, {c:15, r:13}, {c:16, r:13}, {c:17, r:13}]
+    },
+    {
+        id: 'gc3', c: 11, r: 16, owner: null,
+        captureZones: [{c:10, r:15}, {c:11, r:15}, {c:12, r:15}, {c:10, r:16}, {c:12, r:16}, {c:10, r:17}, {c:11, r:17}, {c:12, r:17}]
+    },
+    {
+        id: 'gc4', c: 5, r: 14, owner: null,
+        captureZones: [{c:4, r:13}, {c:5, r:13}, {c:6, r:13}, {c:4, r:14}, {c:6, r:14}, {c:4, r:15}, {c:5, r:15}, {c:6, r:15}]
+    },
+    {
+        id: 'gc5', c: 6, r: 4, owner: null,
+        captureZones: [{c:5, r:3}, {c:6, r:3}, {c:7, r:3}, {c:0, r:4}, {c:1, r:4}, {c:2, r:4}, {c:5, r:4}, {c:7, r:4}, {c:0, r:5}, {c:1, r:5}, {c:2, r:5}, {c:5, r:5}, {c:6, r:5}, {c:7, r:5}, {c:0, r:6}, {c:1, r:6}, {c:2, r:6}]
+    },
+    {
+        id: 'gc6', c: 1, r: 5, owner: null,
+        captureZones: [{c:0, r:4}, {c:1, r:4}, {c:2, r:4}, {c:0, r:5}, {c:2, r:5}, {c:0, r:6}, {c:1, r:6}, {c:2, r:6}]
+    }
 ];
 
 // Load Flag Images
@@ -27,17 +45,12 @@ redFlagImg.onload = () => { redFlagLoaded = true; };
 // Foolproof & Permanent Team Detection
 function getTeamFromUnit(unit) {
     if (!unit) return 'blue';
-    
-    // 1. If team is already permanently stamped on the unit object, return it immediately
     if (unit._assignedTeam) return unit._assignedTeam;
     
-    // 2. Explicit team property if defined elsewhere
     if (unit.team) {
         unit._assignedTeam = unit.team.toLowerCase();
         return unit._assignedTeam;
     }
-    
-    // 3. Name or image path checks
     if (unit.name) {
         let name = unit.name.toLowerCase();
         if (name.includes('red')) { unit._assignedTeam = 'red'; return 'red'; }
@@ -49,28 +62,30 @@ function getTeamFromUnit(unit) {
         if (src.includes('blue')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     
-    // 4. Fallback: Stamp based on initial position ONLY ONCE, then cache it to unit._assignedTeam
     unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue';
-    console.log(`📌 Permanently assigned team '${unit._assignedTeam}' to unit:`, unit.name, `at initial Y: ${unit.gridY}`);
     return unit._assignedTeam;
 }
 
-function isGoldCore(c, r) {
+// Check if a tile is the exact center core coordinate (units cannot step directly on core centers)
+function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
+// Check if a unit's landing position triggers capture via the 'g' capture zones
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
-        let dist = Math.abs(core.c - c) + Math.abs(core.r - r);
-        if (dist <= 1 && core.owner !== team) {
+        // Check if the landed tile (c, r) matches the center core or any of its designated 'g' capture zones
+        let inZone = (core.c === c && core.r === r) || core.captureZones.some(zone => zone.c === c && zone.r === r);
+        
+        if (inZone && core.owner !== team) {
             core.owner = team;
             if (team === 'blue') {
                 blueCoins += 1;
-                console.log(`💰 BLUE captured Gold Core at (${core.c}, ${core.r})!`);
+                console.log(`💰 BLUE captured Gold Core ${core.id} at center (${core.c}, ${core.r})! Blue Coins: ${blueCoins}`);
             } else {
                 redCoins += 1;
-                console.log(`💰 RED captured Gold Core at (${core.c}, ${core.r})!`);
+                console.log(`💰 RED captured Gold Core ${core.id} at center (${core.c}, ${core.r})! Red Coins: ${redCoins}`);
             }
         }
     });
@@ -83,14 +98,14 @@ function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     console.log(`Moving Unit Team detected as: ${unitTeam}`);
 
-    // Strict turn validation
     if (unitTeam !== currentTurn) {
         console.error(`❌ BLOCKED: Tried to move a ${unitTeam} unit, but it is currently ${currentTurn}'s turn!`);
         return false; 
     }
 
-    if (isGoldCore(newC, newR)) {
-        console.error(`❌ BLOCKED: Cannot step directly onto a gold core tile!`);
+    // Block stepping directly onto the center core tile itself
+    if (isGoldCoreCenter(newC, newR)) {
+        console.error(`❌ BLOCKED: Cannot step directly onto a gold core center tile!`);
         return false; 
     }
 
@@ -98,6 +113,7 @@ function tryMoveUnit(unit, newC, newR) {
     unit.gridX = newC;
     unit.gridY = newR;
 
+    // Evaluate capture based on Excel 'g' zones
     checkAndCaptureGold(unit, newC, newR);
 
     // Switch Turn
@@ -114,6 +130,7 @@ function drawTeamUIAndFlags() {
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
+        // Plant the flag on the exact center core coordinate when owned
         if (core.owner === 'blue' && blueFlagLoaded) {
             ctx.drawImage(blueFlagImg, px + cellSize * 0.25, py - cellSize * 0.5, cellSize * 0.5, cellSize * 1.4);
         } else if (core.owner === 'red' && redFlagLoaded) {
