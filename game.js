@@ -107,7 +107,6 @@ function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
         });
 }
 
-// Initialize loading sequence immediately
 loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
 loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
 loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
@@ -119,55 +118,60 @@ loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoad
 loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
 
 function getTerrain(c, r) {
-    if ((c >= 6 && c <= 8) && (r === 0 || r === 1)) {
-        if (c === 7 && r === 0) return 'gold_core';
+    // Note: c (column) and r (row) are 0-indexed (A=0, 1=row 0)
+    
+    // Gold Cores & Gold Squares
+    // Top Cluster (Cols 5-7 [F-H], Rows 3-4 [4-5]) -> Core at G5 (6, 4)
+    if (c >= 5 && c <= 7 && r >= 3 && r <= 4) {
+        if (c === 6 && r === 4) return 'gold_core';
         return 'gold';
     }
-    if ((c >= 6 && c <= 8) && (r >= 4 && r <= 6)) {
-        if (c === 7 && r === 5) return 'gold_core';
+    // Left Cluster (Cols 0-2 [A-C], Rows 4-6 [5-7]) -> Core at B6 (1, 5)
+    if (c >= 0 && c <= 2 && r >= 4 && r <= 6) {
+        if (c === 1 && r === 5) return 'gold_core';
         return 'gold';
     }
-    if (c === 8 && r === 6) return 'gold';
-    if ((c >= 14 && c <= 16) && (r >= 6 && r <= 8)) {
-        if (c === 15 && r === 7) return 'gold_core';
+    // Upper-Right Cluster (Cols 11-13 [L-N], Rows 6-8 [7-9]) -> Core at M8 (12, 7)
+    if (c >= 11 && c <= 13 && r >= 6 && r <= 8) {
+        if (c === 12 && r === 7) return 'gold_core';
         return 'gold';
     }
-    if ((c >= 13 && c <= 15) && (r >= 12 && r <= 14)) {
-        if (c === 14 && r === 13) return 'gold_core';
+    // Lower-Left Cluster (Cols 3-5 [D-F], Rows 13-15 [14-16]) -> Core at E15 (4, 14)
+    if (c >= 3 && c <= 5 && r >= 13 && r <= 15) {
+        if (c === 4 && r === 14) return 'gold_core';
         return 'gold';
     }
-    if ((c >= 2 && c <= 4) && (r >= 10 && r <= 12)) {
-        if (c === 3 && r === 11) return 'gold_core';
+    // Bottom-Right Cluster (Cols 10-12 [K-M], Rows 15-17 [16-18]) -> Core at L17 (11, 16)
+    if (c >= 10 && c <= 12 && r >= 15 && r <= 17) {
+        if (c === 11 && r === 16) return 'gold_core';
         return 'gold';
     }
-    if ((c >= 2 && c <= 4) && (r >= 16 && r === 17)) {
-        if (c === 3 && r === 17) return 'gold_core';
+    // Far-Right Cluster (Cols 15-17 [P-R], Rows 11-13 [12-14]) -> Core at Q13 (16, 12)
+    if (c >= 15 && c <= 17 && r >= 11 && r <= 13) {
+        if (c === 16 && r === 12) return 'gold_core';
         return 'gold';
     }
 
-    if (c === 4 && (r === 8 || r === 9)) return 'water';
-    if (c === 5 && (r >= 7 && r <= 9)) return 'water';
-    if (c === 6 && (r >= 7 && r <= 10)) return 'water';
-    if (c === 7 && (r >= 7 && r <= 11)) return 'water';
-    if (c === 8 && (r >= 6 && r <= 13)) return 'water';
-    if (c === 9 && (r >= 6 && r <= 13)) return 'water';
-    if (c === 10 && (r >= 5 && r <= 12)) return 'water';
-    if (c === 11 && (r >= 4 && r <= 9)) return 'water';
-    if (c === 12 && (r >= 4 && r <= 7)) return 'water';
-    if (c === 13 && (r >= 4 && r <= 6)) return 'water';
+    // Water Cluster (Dark Blue spanning columns E-N [4-13] and rows 5-14 [4-13])
+    if (c >= 4 && c <= 13 && r >= 4 && r <= 13) {
+        return 'water';
+    }
 
-    if ((c >= 10 && c <= 12) && (r === 16 || r === 17)) {
-        if (c === 11 && r === 17) return 'blue_core';
+    // Blue Team (Light Blue squares at Cols 0-1 [A-B], Rows 10-12 [11-13]) -> Core at B12 (1, 11)
+    if (c >= 0 && c <= 1 && r >= 10 && r <= 12) {
+        if (c === 1 && r === 11) return 'blue_core';
         return 'blue_base';
     }
 
-    if ((c === 15 && r === 0) || (c === 16 && r === 0) || (c === 16 && r === 1) || (c === 17 && r === 0) || (c === 17 && r === 1) || (c === 17 && r === 2)) {
-        if (c === 17 && r === 0) return 'red_core';
+    // Red Team (Red squares at Cols 10-12 [K-M], Rows 0-1 [1-2]) -> Core at L1 (11, 0)
+    if (c >= 10 && c <= 12 && r >= 0 && r <= 1.2) {
+        if (c === 11 && r === 0) return 'red_core';
         return 'red_base';
     }
 
-    if (c === 8 && r === 14) return 'blue_navy';
-    if (c === 14 && r === 3) return 'red_navy';
+    // Navy Docks (Purple cells at L6 -> index (11, 5) and D12 -> index (3, 11))
+    if (c === 11 && r === 5) return 'blue_navy';
+    if (c === 3 && r === 11) return 'red_navy';
 
     return 'land';
 }
