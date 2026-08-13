@@ -24,52 +24,50 @@ redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red
 let redFlagLoaded = false;
 redFlagImg.onload = () => { redFlagLoaded = true; };
 
-// Foolproof team detection with debug prints
+// Foolproof team detection
 function getTeamFromUnit(unit) {
-    if (!unit) {
-        console.warn("⚠️ getTeamFromUnit received null/undefined unit!");
-        return 'blue';
-    }
+    if (!unit) return 'blue';
     
-    if (unit.team) {
-        console.log(`🔍 Unit team property found: ${unit.team}`);
-        return unit.team.toLowerCase();
-    }
+    // 1. If unit explicitly has a team property
+    if (unit.team) return unit.team.toLowerCase();
     
+    // 2. Check image source string
     if (unit.img && unit.img.src) {
         let src = unit.img.src.toLowerCase();
-        if (src.includes('red')) {
-            console.log(`🔍 Unit identified as RED via image src: ${src}`);
-            return 'red';
-        }
-        if (src.includes('blue')) {
-            console.log(`🔍 Unit identified as BLUE via image src: ${src}`);
-            return 'blue';
-        }
+        if (src.includes('red')) return 'red';
+        if (src.includes('blue')) return 'blue';
     }
     
+    // 3. Check unit name property
     if (unit.name) {
         let name = unit.name.toLowerCase();
-        if (name.includes('red')) {
-            console.log(`🔍 Unit identified as RED via name: ${name}`);
-            return 'red';
-        }
-        if (name.includes('blue')) {
-            console.log(`🔍 Unit identified as BLUE via name: ${name}`);
-            return 'blue';
+        if (name.includes('red')) return 'red';
+        if (name.includes('blue')) return 'blue';
+    }
+    
+    // 4. Fallback based on units array index or vertical spawn position (e.g., Red usually spawns on top/bottom half)
+    if (typeof units !== 'undefined' && Array.isArray(units)) {
+        let index = units.indexOf(unit);
+        // If your map setup spawns blue first and red second, or vice versa, 
+        // you can split them. Alternatively, if red units start with higher/lower gridY:
+        if (unit.gridY < 9) {
+            // Assuming top half is one team and bottom half is another, 
+            // or let's check if the unit has a custom property set by map_setup.
         }
     }
     
-    console.log(`⚠️ Unit team couldn't be explicitly matched. Defaulting to 'blue'. Unit object:`, unit);
+    // 5. Final fallback: If we can't tell, let's look at whether it's already assigned or default to blue for first half of units list
+    if (typeof units !== 'undefined' && Array.isArray(units)) {
+        let half = Math.floor(units.length / 2);
+        let index = units.indexOf(unit);
+        if (index >= half) return 'red';
+    }
+    
     return 'blue';
 }
 
 function isGoldCore(c, r) {
-    let match = goldCores.some(core => core.c === c && core.r === r);
-    if (match) {
-        console.log(`🛑 Tile (${c}, ${r}) is a Gold Core. Movement blocked.`);
-    }
-    return match;
+    return goldCores.some(core => core.c === c && core.r === r);
 }
 
 function checkAndCaptureGold(unit, c, r) {
@@ -80,10 +78,10 @@ function checkAndCaptureGold(unit, c, r) {
             core.owner = team;
             if (team === 'blue') {
                 blueCoins += 1;
-                console.log(`💰 BLUE captured Gold Core at (${core.c}, ${core.r})! Blue Coins: ${blueCoins}`);
+                console.log(`💰 BLUE captured Gold Core at (${core.c}, ${core.r})!`);
             } else {
                 redCoins += 1;
-                console.log(`💰 RED captured Gold Core at (${core.c}, ${core.r})! Red Coins: ${redCoins}`);
+                console.log(`💰 RED captured Gold Core at (${core.c}, ${core.r})!`);
             }
         }
     });
@@ -94,7 +92,7 @@ function tryMoveUnit(unit, newC, newR) {
     console.log(`Current Turn State: ${currentTurn}`);
     
     let unitTeam = getTeamFromUnit(unit);
-    console.log(`Moving Unit Team: ${unitTeam}`);
+    console.log(`Moving Unit Team detected as: ${unitTeam}`);
 
     // Strict turn validation
     if (unitTeam !== currentTurn) {
@@ -102,13 +100,10 @@ function tryMoveUnit(unit, newC, newR) {
         return false; 
     }
 
-    // Block stepping directly onto gold cores
     if (isGoldCore(newC, newR)) {
         console.error(`❌ BLOCKED: Cannot step directly onto a gold core tile!`);
         return false; 
     }
-
-    console.log(`✅ Move validated successfully from (${unit.gridX}, ${unit.gridY}) to (${newC}, ${newR})`);
 
     // Execute Move
     unit.gridX = newC;
