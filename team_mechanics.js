@@ -1,119 +1,239 @@
-// --- TEAM & TURN STATE ---
-let currentTurn = 'blue'; // 'blue' or 'red'
-let blueCoins = 0;
-let redCoins = 0;
-
-// Gold Cores mapping on the 18x18 grid
-let goldCores = [
-    { c: 4, r: 4, owner: null },
-    { c: 13, r: 5, owner: null },
-    { c: 8, r: 7, owner: null },
-    { c: 9, r: 10, owner: null },
-    { c: 4, r: 14, owner: null },
-    { c: 14, r: 16, owner: null }
-];
-
-// Load Flag Images
-let blueFlagImg = new Image();
-blueFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/blue_flag.jpg';
-let blueFlagLoaded = false;
-blueFlagImg.onload = () => { blueFlagLoaded = true; };
-
-let redFlagImg = new Image();
-redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red_flag.jpg';
-let redFlagLoaded = false;
-redFlagImg.onload = () => { redFlagLoaded = true; };
-
-// Foolproof team detection
-function getTeamFromUnit(unit) {
-    if (!unit) return 'blue';
-    if (unit.team) return unit.team.toLowerCase();
-    
-    // Check image source string (e.g. blue_tank.jpg vs red_tank.jpg)
-    if (unit.img && unit.img.src) {
-        let src = unit.img.src.toLowerCase();
-        if (src.includes('red')) return 'red';
-        if (src.includes('blue')) return 'blue';
-    }
-    
-    // Check unit name property
-    if (unit.name) {
-        let name = unit.name.toLowerCase();
-        if (name.includes('red')) return 'red';
-        if (name.includes('blue')) return 'blue';
-    }
-    
-    return 'blue';
-}
-
-function isGoldCore(c, r) {
-    return goldCores.some(core => core.c === c && core.r === r);
-}
-
-function checkAndCaptureGold(unit, c, r) {
-    let team = getTeamFromUnit(unit);
-    goldCores.forEach(core => {
-        let dist = Math.abs(core.c - c) + Math.abs(core.r - r);
-        if (dist <= 1 && core.owner !== team) {
-            core.owner = team;
-            if (team === 'blue') blueCoins += 1;
-            else redCoins += 1;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Chess - Menu</title>
+    <style>
+        :root {
+            --bg-color: #111;
+            --panel-bg: #1a1a1a;
+            --border-color: #333;
+            --accent-green: #2ecc71;
+            --accent-blue: #3498db;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
         }
-    });
-}
 
-function tryMoveUnit(unit, newC, newR) {
-    let unitTeam = getTeamFromUnit(unit);
-    
-    // Strict turn validation: Block movement if it's not this team's turn
-    if (unitTeam !== currentTurn) {
-        console.log(`Action Denied: Attempted to move ${unitTeam} unit, but it is ${currentTurn}'s turn!`);
-        return false; 
-    }
-
-    // Block stepping directly onto gold cores
-    if (isGoldCore(newC, newR)) {
-        return false; 
-    }
-
-    // Execute Move
-    unit.gridX = newC;
-    unit.gridY = newR;
-
-    checkAndCaptureGold(unit, newC, newR);
-
-    // Switch Turn successfully
-    currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
-    console.log(`Turn successfully switched to: ${currentTurn}`);
-    return true;
-}
-
-function drawTeamUIAndFlags() {
-    goldCores.forEach(core => {
-        let px = core.c * cellSize;
-        let py = core.r * cellSize;
-
-        if (core.owner === 'blue' && blueFlagLoaded) {
-            ctx.drawImage(blueFlagImg, px + cellSize * 0.25, py - cellSize * 0.5, cellSize * 0.5, cellSize * 1.4);
-        } else if (core.owner === 'red' && redFlagLoaded) {
-            ctx.drawImage(redFlagImg, px + cellSize * 0.25, py - cellSize * 0.5, cellSize * 0.5, cellSize * 1.4);
+        body {
+            margin: 0;
+            background: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+            touch-action: manipulation;
+            color: var(--text-main);
         }
-    });
 
-    // Draw HUD Box
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillRect(10, 10, 210, 60);
-    ctx.strokeStyle = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(10, 10, 210, 60);
+        .screen {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            max-width: 540px;
+            max-height: 95vh;
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            flex-direction: column;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
 
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Turn: ${currentTurn.toUpperCase()}`, 20, 30);
-    ctx.fillStyle = '#3498db';
-    ctx.fillText(`Blue Coins: ${blueCoins}`, 20, 48);
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillText(`Red Coins: ${redCoins}`, 120, 48);
-    ctx.restore();
-}
+        .screen.active {
+            display: flex;
+        }
+
+        .screen-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: #222;
+        }
+
+        .back-btn {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .screen-title {
+            margin: 0;
+            flex-grow: 1;
+            text-align: center;
+            font-size: 18px;
+            padding-right: 40px;
+        }
+
+        .version-badge {
+            background: #222;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: bold;
+            align-self: center;
+            margin-top: auto;
+            margin-bottom: 8px;
+        }
+
+        .screen-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .menu-btn {
+            background: #262626;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .board-option-card {
+            background: #222;
+            border: 2px solid var(--border-color);
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .board-option-card.default-board {
+            border-color: var(--accent-green);
+        }
+
+        .confirm-btn {
+            background: var(--accent-green);
+            color: #111;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #game-screen {
+            align-items: center;
+            justify-content: center;
+            position: relative; /* Enables absolute positioning for top-corner elements */
+        }
+
+        /* Top-Corner Version Badge for Game Screen */
+        .game-version-tab {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        canvas {
+            background: #222;
+            border: 2px solid #444;
+            display: block;
+            width: 90vw;
+            height: 90vw;
+            max-width: 500px;
+            max-height: 500px;
+        }
+
+        .game-top-bar {
+            width: 100%;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-screen" class="screen active">
+        <div class="screen-header" style="justify-content: center;">
+            <h2 class="screen-title" style="padding-right: 0;">Modern Chess</h2>
+        </div>
+        <div class="screen-body" style="justify-content: center;">
+            <button class="menu-btn" onclick="navigateTo('offline-options-screen')">Play Offline</button>
+            <button class="menu-btn" onclick="navigateTo('online-servers-screen')">Play Online</button>
+            <button class="menu-btn" onclick="navigateTo('manual-main-screen')">How to Play</button>
+            <button class="menu-btn" onclick="navigateTo('files-manager-screen')">Files Manager</button>
+            <button class="menu-btn" onclick="navigateTo('settings-screen')">Settings</button>
+            <div class="version-badge">v1.229</div>
+        </div>
+    </div>
+
+    <div id="offline-options-screen" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button>
+            <h2 class="screen-title">Select Board</h2>
+        </div>
+        <div class="screen-body">
+            <div class="board-option-card default-board">
+                <div class="board-info"><h3 style="margin:0;">Basic Board (Default)</h3></div>
+                <button class="confirm-btn" onclick="navigateTo('game-screen')">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <!-- Top Corner Version Tab -->
+        <div class="game-version-tab">v1.229</div>
+
+        <div class="game-top-bar">
+            <button class="back-btn" onclick="navigateTo('offline-options-screen')">Back</button>
+            <span style="font-size: 11px; color: #aaa;">Long press unit -> Orange legal -> Green target -> Confirm</span>
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; flex-grow:1;">
+            <canvas id="gameCanvas" width="540" height="540"></canvas>
+        </div>
+    </div>
+
+    <script>
+        function navigateTo(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+    </script>
+    
+    <!-- REQUIRED SCRIPT LOAD ORDER -->
+    <script src="map_setup.js"></script>
+    <script src="team_mechanics.js"></script>
+    <script src="unit_movement.js"></script>
+</body>
+</html>
