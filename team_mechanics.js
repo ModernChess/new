@@ -4,7 +4,7 @@ let blueCoins = 0;
 let redCoins = 0;
 
 let flagAnimations = {}; 
-let destroyedUnitsQueue = []; // Tracks units undergoing the slow disintegration effect
+let destroyedUnitsQueue = [];
 
 // Precise Gold Cores and strict Excel-mapped capture zones
 let goldCores = [
@@ -69,7 +69,7 @@ function getTeamFromUnit(unit) {
     return unit._assignedTeam;
 }
 
-// Unit Power Rule: Infantry = 1, Tank = 2. Artillery and Ships = 0 (Special Units)
+// Unit Power Rule: Infantry = 1, Tank = 2. Artillery and Ships = 0
 function getUnitPower(unit) {
     if (!unit) return 0;
     let name = (unit.name || '').toLowerCase();
@@ -80,21 +80,18 @@ function getUnitPower(unit) {
     return 1; 
 }
 
-// Check if a unit is a special unit (Artillery or Ship) that cannot connect or form superunits with tanks/infantry
 function isSpecialUnit(unit) {
     if (!unit) return false;
     let name = (unit.name || '').toLowerCase();
     return name.includes('artillery') || name.includes('ship') || name.includes('boat') || getUnitPower(unit) === 0;
 }
 
-// Helper: Check if two units are touching orthogonally or diagonally
 function areUnitsConnected(u1, u2) {
     let dx = Math.abs(u1.gridX - u2.gridX);
     let dy = Math.abs(u1.gridY - u2.gridY);
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
-// Calculate Superunits (Excluding Artillery and Ships from connecting)
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u));
     let visited = new Set();
@@ -123,7 +120,6 @@ function getSuperunitsForTeam(teamName, allUnits) {
         superunits.push({ units: group, power: totalPower });
     });
 
-    // Also include special units as individual groups of power 0 (or individual power if specified)
     let specialUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && isSpecialUnit(u));
     specialUnits.forEach(su => {
         superunits.push({ units: [su], power: getUnitPower(su) });
@@ -132,7 +128,27 @@ function getSuperunitsForTeam(teamName, allUnits) {
     return superunits;
 }
 
-// Trigger Gradual Disintegration Effect before final removal
+// Check if a specific unit is currently locked in a stalemate
+function isUnitLockedInStalemate(unit) {
+    let team = getTeamFromUnit(unit);
+    let opposingTeam = team === 'blue' ? 'red' : 'blue';
+    let teamSupers = getSuperunitsForTeam(team, units);
+    let opposingSupers = getSuperunitsForTeam(opposingTeam, units);
+
+    let isLocked = false;
+    teamSupers.forEach(su => {
+        if (su.units.includes(unit)) {
+            opposingSupers.forEach(oSu => {
+                let touching = oSu.units.some(ou => su.units.some(u => areUnitsConnected(u, ou) || (u.gridX === ou.gridX && u.gridY === ou.gridY)));
+                if (touching && su.power === oSu.power) {
+                    isLocked = true;
+                }
+            });
+        }
+    });
+    return isLocked;
+}
+
 function queueForDisintegration(unitList) {
     let now = performance.now();
     unitList.forEach(u => {
@@ -140,13 +156,12 @@ function queueForDisintegration(unitList) {
             destroyedUnitsQueue.push({
                 unit: u,
                 startTime: now,
-                duration: 1800 // Noticeably longer slow disintegration duration (1.8 seconds)
+                duration: 1800 
             });
         }
     });
 }
 
-// Continuous check for combat interactions & destructions
 function resolveUnitInteractions() {
     let blueSupers = getSuperunitsForTeam('blue', units);
     let redSupers = getSuperunitsForTeam('red', units);
@@ -167,7 +182,6 @@ function resolveUnitInteractions() {
         });
     });
 
-    // Clean up units whose disintegration timer has completed
     let now = performance.now();
     let fullyDestroyed = destroyedUnitsQueue.filter(item => (now - item.startTime) >= item.duration).map(item => item.unit);
     if (fullyDestroyed.length > 0) {
@@ -203,13 +217,18 @@ function checkAndCaptureGold(unit, c, r) {
     });
 }
 
-// Move Unit with Lock-in Stalemate Support
+// Prevent moving locked stalemate units
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     if (unitTeam !== currentTurn) return false; 
     if (isGoldCoreCenter(newC, newR)) return false; 
 
-    // Execute the move first so the unit physically arrives at the target location
+    // Prohibit movement if the unit is currently locked in a stalemate
+    if (isUnitLockedInStalemate(unit)) {
+        console.log(`🔒 STALEMATE LOCK: Unit cannot be moved while locked in equal power stalemate!`);
+        return false;
+    }
+
     unit.gridX = newC;
     unit.gridY = newR;
 
@@ -220,13 +239,39 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Custom Render Extension for Disintegration Effect & Stalemate Locks 🔒
+// Main Render Function: Ensuring Flags and Power Badges Always Appear On Top
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
 
     resolveUnitInteractions();
 
-    // Draw Gold Core Flags
+    // 1. Handle Gradual Patch-by-Patch Disintegration Overlay
+    destroyedUnitsQueue.forEach(item => {
+        let elapsed = currentTime - item.startTime;
+        let progress = Math.min(1, elapsed / item.duration);
+        let ux = item.unit.gridX * cellSize;
+        let uy = item.unit.gridY * cellSize;
+
+        ctx.save();
+        let cols = 4;
+        let rows = 4;
+        let cellW = cellSize / cols;
+        let cellH = cellSize / rows;
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                let threshold = (r * cols + c) / (rows * cols);
+                if (progress > threshold) {
+                    let alpha = Math.max(0, 1 - ((progress - threshold) * rows * cols * 0.5));
+                    ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
+                    ctx.fillRect(ux + c * cellW, uy + r * cellH, cellW - 1, cellH - 1);
+                }
+            }
+        }
+        ctx.restore();
+    });
+
+    // 2. Render Gold Core Flags (Always on top of units)
     goldCores.forEach(core => {
         if (!core.owner) return;
         let px = core.c * cellSize;
@@ -256,14 +301,13 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    // Render Superunit Power Labels & Stalemate Locks 🔒
+    // 3. Render Larger Red Background Tags for Superunit Power & Stalemate Locks (Top Layer)
     ['blue', 'red'].forEach(team => {
         let superunits = getSuperunitsForTeam(team, units);
         let opposingTeam = team === 'blue' ? 'red' : 'blue';
         let opposingSupers = getSuperunitsForTeam(opposingTeam, units);
 
         superunits.forEach(su => {
-            // Check if this superunit is in a deadlock with an opposing equal-power superunit
             let isLocked = false;
             su.units.forEach(u => {
                 opposingSupers.forEach(oSu => {
@@ -277,52 +321,41 @@ function drawTeamUIAndFlags() {
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
-            ctx.save();
-            ctx.font = 'bold 12px sans-serif';
-            ctx.fillStyle = '#ff3333'; 
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            
-            let label = su.units.length > 1 ? `Power: ${su.power}` : '';
-            if (isLocked) label += ' 🔒';
+            let labelText = su.units.length > 1 ? `${su.power}` : '';
+            if (isLocked) labelText += ' 🔒';
 
-            if (label.trim() !== '') {
-                ctx.strokeText(label, avgX + cellSize * 0.1, avgY - 4);
-                ctx.fillText(label, avgX + cellSize * 0.1, avgY - 4);
+            if (labelText.trim() !== '') {
+                ctx.save();
+                ctx.font = 'bold 14px sans-serif';
+                
+                let textMetrics = ctx.measureText(labelText);
+                let paddingX = 8;
+                let paddingY = 5;
+                let tagWidth = textMetrics.width + paddingX * 2;
+                let tagHeight = 22;
+                let tagX = avgX + (cellSize / 2) - (tagWidth / 2);
+                let tagY = avgY - tagHeight - 6; // Positioned clearly above the superunit scope
+
+                // Draw solid red background pill/label tag
+                ctx.fillStyle = '#cc0000';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(tagX, tagY, tagWidth, tagHeight, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                // Draw text inside tag
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, tagX + tagWidth / 2, tagY + tagHeight / 2);
+                ctx.restore();
             }
-            ctx.restore();
         });
     });
 
-    // Handle Gradual Patch-by-Patch Disintegration Overlay for Destroyed Units
-    destroyedUnitsQueue.forEach(item => {
-        let elapsed = currentTime - item.startTime;
-        let progress = Math.min(1, elapsed / item.duration);
-        let ux = item.unit.gridX * cellSize;
-        let uy = item.unit.gridY * cellSize;
-
-        ctx.save();
-        // Create a grid-patterned progressive fade disintegration effect
-        let cols = 4;
-        let rows = 4;
-        let cellW = cellSize / cols;
-        let cellH = cellSize / rows;
-
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                // Stagger the disappearance across areas of the square
-                let threshold = (r * cols + c) / (rows * cols);
-                if (progress > threshold) {
-                    let alpha = Math.max(0, 1 - ((progress - threshold) * rows * cols * 0.5));
-                    ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
-                    ctx.fillRect(ux + c * cellW, uy + r * cellH, cellW - 1, cellH - 1);
-                }
-            }
-        }
-        ctx.restore();
-    });
-
-    // Draw HUD Box
+    // 4. Draw HUD Box
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.fillRect(10, 10, 210, 60);
