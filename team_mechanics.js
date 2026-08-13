@@ -24,43 +24,28 @@ redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red
 let redFlagLoaded = false;
 redFlagImg.onload = () => { redFlagLoaded = true; };
 
-// Foolproof team detection
+// Foolproof team detection using position & properties
 function getTeamFromUnit(unit) {
     if (!unit) return 'blue';
     
-    // 1. If unit explicitly has a team property
+    // 1. Explicit team property if it exists
     if (unit.team) return unit.team.toLowerCase();
     
-    // 2. Check image source string
+    // 2. Name or image path checks
+    if (unit.name) {
+        let name = unit.name.toLowerCase();
+        if (name.includes('red')) return 'red';
+        if (name.includes('blue')) return 'blue';
+    }
     if (unit.img && unit.img.src) {
         let src = unit.img.src.toLowerCase();
         if (src.includes('red')) return 'red';
         if (src.includes('blue')) return 'blue';
     }
     
-    // 3. Check unit name property
-    if (unit.name) {
-        let name = unit.name.toLowerCase();
-        if (name.includes('red')) return 'red';
-        if (name.includes('blue')) return 'blue';
-    }
-    
-    // 4. Fallback based on units array index or vertical spawn position (e.g., Red usually spawns on top/bottom half)
-    if (typeof units !== 'undefined' && Array.isArray(units)) {
-        let index = units.indexOf(unit);
-        // If your map setup spawns blue first and red second, or vice versa, 
-        // you can split them. Alternatively, if red units start with higher/lower gridY:
-        if (unit.gridY < 9) {
-            // Assuming top half is one team and bottom half is another, 
-            // or let's check if the unit has a custom property set by map_setup.
-        }
-    }
-    
-    // 5. Final fallback: If we can't tell, let's look at whether it's already assigned or default to blue for first half of units list
-    if (typeof units !== 'undefined' && Array.isArray(units)) {
-        let half = Math.floor(units.length / 2);
-        let index = units.indexOf(unit);
-        if (index >= half) return 'red';
+    // 3. Position-based detection (Top half = Red, Bottom half = Blue on an 18x18 grid)
+    if (typeof unit.gridY === 'number') {
+        return unit.gridY < 9 ? 'red' : 'blue';
     }
     
     return 'blue';
