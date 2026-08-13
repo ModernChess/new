@@ -1,257 +1,261 @@
-let selectedUnit = null;     
-let legalMoves = [];         
-let targetTile = null;       
-let pressTimer = null;       
-let rangeMode = false;
-let rangeSquares = [];
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-// Helper function to get larger grid coordinate (Al-Il, 1l-9l) from 18x18 grid
-function getLargerCoord(c, r) {
-    const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
-    const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
-    let lc = Math.floor(c / 2);
-    let lr = Math.floor(r / 2);
-    if (lc >= 9) lc = 8;
-    if (lr >= 9) lr = 8;
-    return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
+const cols = 18;
+const rows = 18;
+const cellSize = canvas.width / cols;
+
+function lerp(start, end, t) {
+    return start + (end - start) * t;
 }
 
-// Function to calculate Ship (1 square range) or Artillery (3 square rays like a Queen)
-function getUnitCombatRange(unit) {
-    let maxDist = (unit.name === 'Ship') ? 1 : (unit.name === 'Artillery' ? 3 : 0);
-    if (maxDist === 0) return [];
+const ghBase = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/';
 
-    let currentLg = getLargerCoord(unit.gridX, unit.gridY);
-    let results = [];
+// Dynamic Loading Screen Overlay
+const loadingOverlay = document.createElement('div');
+loadingOverlay.style.position = 'fixed';
+loadingOverlay.style.top = '0';
+loadingOverlay.style.left = '0';
+loadingOverlay.style.width = '100vw';
+loadingOverlay.style.height = '100vh';
+loadingOverlay.style.backgroundColor = '#111111';
+loadingOverlay.style.zIndex = '9999';
+loadingOverlay.style.display = 'flex';
+loadingOverlay.style.flexDirection = 'column';
+loadingOverlay.style.justifyContent = 'center';
+loadingOverlay.style.alignItems = 'center';
+loadingOverlay.style.color = '#ffffff';
+loadingOverlay.style.fontFamily = 'sans-serif';
+loadingOverlay.innerHTML = `
+    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
+    <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
+        <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
+    </div>
+    <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
+`;
+document.body.appendChild(loadingOverlay);
 
-    // 8 directions (Queen-like ray casting)
-    let directions = [
-        {dx: 0, dy: -1}, {dx: 0, dy: 1},  // Up, Down
-        {dx: -1, dy: 0}, {dx: 1, dy: 0},  // Left, Right
-        {dx: -1, dy: -1}, {dx: 1, dy: -1}, // Diagonals up-left, up-right
-        {dx: -1, dy: 1}, {dx: 1, dy: 1}   // Diagonals down-left, down-right
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+
+const assetUrls = [
+    ghBase + 'map2.png',
+    ghBase + 'blue_tank.jpg',
+    ghBase + 'blue_infantry.jpg',
+    ghBase + 'blue_artillery.jpg',
+    ghBase + 'blue_ship.jpg',
+    ghBase + 'red_tank.jpg',
+    ghBase + 'red_infantry.jpg',
+    ghBase + 'red_artillery.jpg',
+    ghBase + 'red_ship.jpg'
+];
+
+let loadedCount = 0;
+const totalAssets = assetUrls.length;
+
+let mapImg = new Image();
+let mapLoaded = false;
+
+let blueTankImg = new Image(), blueTankLoaded = false;
+let blueInfantryImg = new Image(), blueInfantryLoaded = false;
+let blueArtilleryImg = new Image(), blueArtilleryLoaded = false;
+let blueShipImg = new Image(), blueShipLoaded = false;
+
+let redTankImg = new Image(), redTankLoaded = false;
+let redInfantryImg = new Image(), redInfantryLoaded = false;
+let redArtilleryImg = new Image(), redArtilleryLoaded = false;
+let redShipImg = new Image(), redShipLoaded = false;
+
+function updateLoadingProgress() {
+    loadedCount++;
+    let percent = Math.floor((loadedCount / totalAssets) * 100);
+    progressBar.style.width = percent + '%';
+    progressText.innerText = percent + '%';
+
+    if (loadedCount >= totalAssets) {
+        setTimeout(() => {
+            loadingOverlay.style.opacity = '0';
+            loadingOverlay.style.transition = 'opacity 0.4s ease';
+            setTimeout(() => loadingOverlay.remove(), 400);
+        }, 300);
+    }
+}
+
+function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
+    fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.blob();
+        })
+        .then(blob => {
+            let objectURL = URL.createObjectURL(blob);
+            imgObj.src = objectURL;
+            imgObj.onload = () => {
+                setLoadedFlag(true);
+                updateLoadingProgress();
+            };
+        })
+        .catch(err => {
+            imgObj.src = url;
+            imgObj.onload = () => {
+                setLoadedFlag(true);
+                updateLoadingProgress();
+            };
+            imgObj.onerror = () => {
+                updateLoadingProgress();
+            };
+        });
+}
+
+loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
+loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
+loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[3], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[4], blueShipImg, (val) => { blueShipLoaded = val; });
+loadAssetWithProgress(assetUrls[5], redTankImg, (val) => { redTankLoaded = val; });
+loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
+
+function getTerrain(c, r) {
+    const colChar = String.fromCharCode(65 + c);
+    const rowNum = r + 1;
+    const coord = colChar + rowNum;
+
+    const waterList = [
+        'I5', 'J5', 'I6', 'J6', 'K6', 'H7', 'I7', 'J7', 'K7', 'G8', 'H8', 'I8', 'J8', 'K8', 
+        'E9', 'F9', 'G9', 'H9', 'I9', 'J9', 'K9', 'L9', 'E10', 'F10', 'G10', 'H10', 'I10', 
+        'J10', 'K10', 'L10', 'F11', 'G11', 'H11', 'I11', 'J11', 'K11', 'L11', 'M11', 'I12', 
+        'J12', 'K12', 'L12', 'M12', 'N12', 'K13', 'L13', 'M13', 'N13', 'L14', 'M14', 'N14'
     ];
+    if (waterList.includes(coord)) return 'water';
 
-    directions.forEach(dir => {
-        for (let step = 1; step <= maxDist; step++) {
-            let nc = currentLg.colIdx + (dir.dx * step);
-            let nr = currentLg.rowIdx + (dir.dy * step);
-            if (nc >= 0 && nc < 9 && nr >= 0 && nr < 9) {
-                results.push({
-                    startC: nc * 2,
-                    startR: nr * 2,
-                    endC: nc * 2 + 1,
-                    endR: nr * 2 + 1
-                });
-            }
-        }
-    });
+    if (coord === 'F12') return 'blue_navy';
+    if (coord === 'L6') return 'red_navy';
 
-    return results;
-}
+    if (coord === 'A12') return 'blue_core';
+    if (coord === 'A11' || coord === 'B11' || coord === 'B12' || coord === 'A13' || coord === 'B13') return 'blue_base';
 
-function getLegalMoves(unit) {
-    let moves = [];
-    let maxRange = unit.range;
-    let cx = unit.gridX;
-    let cy = unit.gridY;
+    if (coord === 'L1') return 'red_core';
+    if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
 
-    let directions = [
-        {dx: 0, dy: -1}, {dx: 0, dy: 1},  
-        {dx: -1, dy: 0}, {dx: 1, dy: 0},  
-        {dx: -1, dy: -1}, {dx: 1, dy: -1}, 
-        {dx: -1, dy: 1}, {dx: 1, dy: 1}    
+    const goldCores = ['G5', 'B6', 'M8', 'F15', 'Q13', 'L17'];
+    if (goldCores.includes(coord)) return 'gold_core';
+
+    const goldList = [
+        'F4', 'G4', 'H4', 'A5', 'B5', 'C5', 'F5', 'H5', 'A6', 'C6', 'F6', 'G6', 'H6', 
+        'A7', 'B7', 'C7', 'L7', 'M7', 'N7', 'L8', 'N8', 'M9', 'N9', 'P12', 'Q12', 'R12', 
+        'P13', 'R13', 'E14', 'F14', 'G14', 'P14', 'Q14', 'R14', 'E15', 'G15', 'E16', 'F16', 
+        'G16', 'K16', 'L16', 'M16', 'K17', 'M17', 'K18', 'L18', 'M18'
     ];
+    if (goldList.includes(coord)) return 'gold';
 
-    directions.forEach(dir => {
-        for (let step = 1; step <= maxRange; step++) {
-            let nc = cx + (dir.dx * step);
-            let nr = cy + (dir.dy * step);
-
-            if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
-                let terrain = getTerrain(nc, nr);
-                let isWater = isWaterTerrain(terrain);
-
-                let validTerrain = false;
-                if (unit.type === 'land' && !isWater) validTerrain = true;
-                if (unit.type === 'water' && isWater) validTerrain = true;
-
-                if (!validTerrain) break;
-                moves.push({c: nc, r: nr});
-            } else {
-                break;
-            }
-        }
-    });
-
-    return moves;
+    return 'land';
 }
 
-canvas.addEventListener('pointerdown', (e) => {
-    let rect = canvas.getBoundingClientRect();
-    let scaleX = canvas.width / rect.width;
-    let scaleY = canvas.height / rect.height;
+function isWaterTerrain(terrain) {
+    return terrain === 'water' || terrain === 'blue_navy' || terrain === 'red_navy';
+}
 
-    let touchX = (e.clientX - rect.left) * scaleX;
-    let touchY = (e.clientY - rect.top) * scaleY;
+let units = [];
 
-    // Check if clicking the top-right 'X' close button when range mode is active
-    if (rangeMode) {
-        if (touchX >= canvas.width - 60 && touchX <= canvas.width - 15 && touchY >= 15 && touchY <= 60) {
-            rangeMode = false;
-            rangeSquares = [];
-            return;
+function getBaseSquares(team) {
+    let squares = [];
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            let t = getTerrain(c, r);
+            if (team === 'blue' && (t === 'blue_base' || t === 'blue_core')) squares.push({c, r});
+            if (team === 'red' && (t === 'red_base' || t === 'red_core')) squares.push({c, r});
         }
     }
+    return squares;
+}
 
-    let c = Math.floor(touchX / cellSize);
-    let r = Math.floor(touchY / cellSize);
+function getPortSquare(team) {
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            let t = getTerrain(c, r);
+            if (team === 'blue' && t === 'blue_navy') return {c, r};
+            if (team === 'red' && t === 'red_navy') return {c, r};
+        }
+    }
+    return {c:0, r:0};
+}
 
-    if (r >= 0 && r < rows && c >= 0 && c < cols) {
-        let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
+function spawnTeam(team) {
+    let isBlue = (team === 'blue');
+    let baseSquares = getBaseSquares(team);
+    let port = getPortSquare(team);
 
-        if (clickedUnit) {
-            pressTimer = setTimeout(() => {
-                selectedUnit = clickedUnit;
-                legalMoves = getLegalMoves(clickedUnit);
-                targetTile = null; 
-                rangeMode = false; 
-            }, 500); 
-        } else {
-            // Check if clicking the distant external toggle button for Ship or Artillery
-            if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
-                let btnX = selectedUnit.renderX + cellSize + 12;
-                let btnY = selectedUnit.renderY - 12;
-                let btnSize = cellSize * 0.85;
+    let tankImgRef = isBlue ? blueTankImg : redTankImg;
+    let tankLoadRef = () => isBlue ? blueTankLoaded : redTankLoaded;
+    let infImgRef = isBlue ? blueInfantryImg : redInfantryImg;
+    let infLoadRef = () => isBlue ? blueInfantryLoaded : redInfantryLoaded;
+    let artImgRef = isBlue ? blueArtilleryImg : redArtilleryImg;
+    let artLoadRef = () => isBlue ? blueArtilleryLoaded : redArtilleryLoaded;
+    let shipImgRef = isBlue ? blueShipImg : redShipImg;
+    let shipLoadRef = () => isBlue ? blueShipLoaded : redShipLoaded;
 
-                if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
-                    rangeMode = !rangeMode; // Toggle on/off with the exact same button
-                    if (rangeMode) {
-                        rangeSquares = getUnitCombatRange(selectedUnit);
-                    } else {
-                        rangeSquares = [];
-                    }
-                    return;
+    // Ship spawns at the port
+    units.push({ name: 'Ship', type: 'water', range: 2, gridX: port.c, gridY: port.r, x: port.c*cellSize, y: port.r*cellSize, img: shipImgRef, loaded: shipLoadRef });
+
+    // Helper to find a free spawn position starting from base squares and expanding outward into valid land tiles
+    function getAvailableLandPos() {
+        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
+        if (availableBase.length > 0) {
+            return availableBase[Math.floor(Math.random() * availableBase.length)];
+        }
+
+        let core = baseSquares.find(b => getTerrain(b.c, b.r).includes('core')) || baseSquares[0];
+        let queue = [core];
+        let visited = new Set([`${core.c},${core.r}`]);
+
+        while (queue.length > 0) {
+            let curr = queue.shift();
+
+            if (!units.some(u => u.gridX === curr.c && u.gridY === curr.r)) {
+                let t = getTerrain(curr.c, curr.r);
+                if (!isWaterTerrain(t)) {
+                    return curr;
                 }
             }
 
-            if (selectedUnit && !rangeMode) {
-                let isLegal = legalMoves.some(m => m.c === c && m.r === r);
-                if (isLegal) {
-                    if (targetTile && targetTile.c === c && targetTile.r === r) {
-                        selectedUnit.gridX = c;
-                        selectedUnit.gridY = r;
-                        selectedUnit = null;
-                        legalMoves = [];
-                        targetTile = null;
-                    } else {
-                        targetTile = { c: c, r: r };
+            let neighbors = [
+                {c: curr.c, r: curr.r - 1},
+                {c: curr.c, r: curr.r + 1},
+                {c: curr.c - 1, r: curr.r},
+                {c: curr.c + 1, r: curr.r}
+            ];
+
+            for (let n of neighbors) {
+                if (n.c >= 0 && n.c < cols && n.r >= 0 && n.r < rows) {
+                    let key = `${n.c},${n.r}`;
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        queue.push(n);
                     }
                 }
             }
         }
-    }
-});
-
-canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-
-function update() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (mapLoaded) {
-        ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        return baseSquares[0];
     }
 
-    units.forEach(u => {
-        let targetX = u.gridX * cellSize;
-        let targetY = u.gridY * cellSize;
-        
-        u.x = lerp(u.x, targetX, 0.025);
-        u.y = lerp(u.y, targetY, 0.025);
-
-        let isMoving = Math.abs(u.x - targetX) > 0.1 || Math.abs(u.y - targetY) > 0.1;
-        u.renderX = u.x + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
-        u.renderY = u.y + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-        ctx.beginPath();
-        ctx.arc(u.renderX + cellSize / 2, u.renderY + cellSize - 8, cellSize * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-    });
-
-    // Render Selection, Movement Outlines, or White Range Outlines
-    if (selectedUnit) {
-        if (rangeMode) {
-            ctx.strokeStyle = '#ffffff'; // White outline for range
-            ctx.lineWidth = 3.5;
-            rangeSquares.forEach(sq => {
-                let px = sq.startC * cellSize;
-                let py = sq.startR * cellSize;
-                let pWidth = (sq.endC - sq.startC + 1) * cellSize;
-                let pHeight = (sq.endR - sq.startR + 1) * cellSize;
-                ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
-            });
-
-            // Draw top-right close 'X' button
-            ctx.fillStyle = '#e74c3c';
-            ctx.fillRect(canvas.width - 60, 15, 45, 45);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(canvas.width - 60, 15, 45, 45);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.fillText('X', canvas.width - 43, 47);
-
-        } else {
-            ctx.strokeStyle = '#ff8000';
-            ctx.lineWidth = 3;
-            legalMoves.forEach(m => {
-                ctx.strokeRect(m.c * cellSize + 2, m.r * cellSize + 2, cellSize - 4, cellSize - 4);
-            });
-
-            ctx.strokeStyle = '#ffff00';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
-        }
-
-        // Draw distant external toggle button for Ship or Artillery (shows in both normal and range modes so it can toggle off)
-        if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
-            let btnX = selectedUnit.renderX + cellSize + 12;
-            let btnY = selectedUnit.renderY - 12;
-            let btnSize = cellSize * 0.85;
-            
-            ctx.fillStyle = rangeMode ? '#c0392b' : '#e74c3c';
-            ctx.fillRect(btnX, btnY, btnSize, btnSize);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(btnX, btnY, btnSize, btnSize);
-
-            // Crosshair / Toggle icon inside the button
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+    // Spawn 3 Tanks
+    for (let i = 0; i < 3; i++) {
+        let pos = getAvailableLandPos();
+        units.push({ name: 'Tank', type: 'land', range: 3, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: tankImgRef, loaded: tankLoadRef });
     }
 
-    if (targetTile && !rangeMode) {
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(targetTile.c * cellSize + 2, targetTile.r * cellSize + 2, cellSize - 4, cellSize - 4);
+    // Spawn 5 Infantry
+    for (let i = 0; i < 5; i++) {
+        let pos = getAvailableLandPos();
+        units.push({ name: 'Infantry', type: 'land', range: 2, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: infImgRef, loaded: infLoadRef });
     }
 
-    units.forEach(u => {
-        if (u.loaded && u.loaded()) {
-            ctx.drawImage(u.img, u.renderX + 2, u.renderY + 2, cellSize - 4, cellSize - 4);
-        }
-    });
-
-    requestAnimationFrame(update);
+    // Spawn 1 Artillery
+    let artPos = getAvailableLandPos();
+    units.push({ name: 'Artillery', type: 'land', range: 2, gridX: artPos.c, gridY: artPos.r, x: artPos.c*cellSize, y: artPos.r*cellSize, img: artImgRef, loaded: artLoadRef });
 }
 
-update();
+spawnTeam('blue');
+spawnTeam('red');
