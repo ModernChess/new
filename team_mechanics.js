@@ -45,7 +45,6 @@ redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red
 let redFlagLoaded = false;
 redFlagImg.onload = () => { redFlagLoaded = true; };
 
-// Team Detection
 function getTeamFromUnit(unit) {
     if (!unit) return 'blue';
     if (unit._assignedTeam) return unit._assignedTeam;
@@ -69,7 +68,6 @@ function getTeamFromUnit(unit) {
     return unit._assignedTeam;
 }
 
-// Unit Power Rule: Infantry = 1, Tank = 2. Artillery and Ships = 0
 function getUnitPower(unit) {
     if (!unit) return 0;
     let name = (unit.name || '').toLowerCase();
@@ -92,8 +90,10 @@ function areUnitsConnected(u1, u2) {
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
+// Extended Superunit calculation incorporating Enemy-Bridged Proxy Connections
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u));
+    let enemyUnits = allUnits.filter(u => getTeamFromUnit(u) !== teamName && !isSpecialUnit(u));
     let visited = new Set();
     let superunits = [];
 
@@ -108,10 +108,23 @@ function getSuperunitsForTeam(teamName, allUnits) {
             let curr = queue.shift();
             group.push(curr);
 
+            // 1. Direct friendly connections
             teamUnits.forEach(other => {
                 if (!visited.has(other) && areUnitsConnected(curr, other)) {
                     visited.add(other);
                     queue.push(other);
+                }
+            });
+
+            // 2. Proxy Bridge Connections through adjacent enemy units
+            teamUnits.forEach(other => {
+                if (!visited.has(other)) {
+                    // Check if there is an enemy unit bridging them (both friendly units touch the same enemy)
+                    let bridgedByEnemy = enemyUnits.some(eUnit => areUnitsConnected(curr, eUnit) && areUnitsConnected(other, eUnit));
+                    if (bridgedByEnemy) {
+                        visited.add(other);
+                        queue.push(other);
+                    }
                 }
             });
         }
@@ -128,7 +141,6 @@ function getSuperunitsForTeam(teamName, allUnits) {
     return superunits;
 }
 
-// Check if a specific unit is currently locked in a stalemate
 function isUnitLockedInStalemate(unit) {
     let team = getTeamFromUnit(unit);
     let opposingTeam = team === 'blue' ? 'red' : 'blue';
@@ -217,13 +229,11 @@ function checkAndCaptureGold(unit, c, r) {
     });
 }
 
-// Prevent moving locked stalemate units
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     if (unitTeam !== currentTurn) return false; 
     if (isGoldCoreCenter(newC, newR)) return false; 
 
-    // Prohibit movement if the unit is currently locked in a stalemate
     if (isUnitLockedInStalemate(unit)) {
         console.log(`🔒 STALEMATE LOCK: Unit cannot be moved while locked in equal power stalemate!`);
         return false;
@@ -239,13 +249,15 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Main Render Function: Ensuring Flags and Power Badges Always Appear On Top
+// =========================================================================
+// RENDER FUNCTION: MUST BE CALLED AFTER MAIN UNITS DRAWING LOOP IN YOUR APP
+// =========================================================================
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
 
     resolveUnitInteractions();
 
-    // 1. Handle Gradual Patch-by-Patch Disintegration Overlay
+    // 1. Disintegration Overlay
     destroyedUnitsQueue.forEach(item => {
         let elapsed = currentTime - item.startTime;
         let progress = Math.min(1, elapsed / item.duration);
@@ -271,7 +283,7 @@ function drawTeamUIAndFlags() {
         ctx.restore();
     });
 
-    // 2. Render Gold Core Flags (Always on top of units)
+    // 2. Render Gold Core Flags (Absolute Top Layer)
     goldCores.forEach(core => {
         if (!core.owner) return;
         let px = core.c * cellSize;
@@ -301,7 +313,7 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    // 3. Render Larger Red Background Tags for Superunit Power & Stalemate Locks (Top Layer)
+    // 3. Render Power Badges & Stalemate Locks (Absolute Top Layer, Un-overshadowed)
     ['blue', 'red'].forEach(team => {
         let superunits = getSuperunitsForTeam(team, units);
         let opposingTeam = team === 'blue' ? 'red' : 'blue';
@@ -334,9 +346,8 @@ function drawTeamUIAndFlags() {
                 let tagWidth = textMetrics.width + paddingX * 2;
                 let tagHeight = 22;
                 let tagX = avgX + (cellSize / 2) - (tagWidth / 2);
-                let tagY = avgY - tagHeight - 6; // Positioned clearly above the superunit scope
+                let tagY = avgY - tagHeight - 6;
 
-                // Draw solid red background pill/label tag
                 ctx.fillStyle = '#cc0000';
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2;
@@ -345,7 +356,6 @@ function drawTeamUIAndFlags() {
                 ctx.fill();
                 ctx.stroke();
 
-                // Draw text inside tag
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
