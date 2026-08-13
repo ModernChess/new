@@ -24,31 +24,35 @@ redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red
 let redFlagLoaded = false;
 redFlagImg.onload = () => { redFlagLoaded = true; };
 
-// Foolproof team detection using position & properties
+// Foolproof & Permanent Team Detection
 function getTeamFromUnit(unit) {
     if (!unit) return 'blue';
     
-    // 1. Explicit team property if it exists
-    if (unit.team) return unit.team.toLowerCase();
+    // 1. If team is already permanently stamped on the unit object, return it immediately
+    if (unit._assignedTeam) return unit._assignedTeam;
     
-    // 2. Name or image path checks
+    // 2. Explicit team property if defined elsewhere
+    if (unit.team) {
+        unit._assignedTeam = unit.team.toLowerCase();
+        return unit._assignedTeam;
+    }
+    
+    // 3. Name or image path checks
     if (unit.name) {
         let name = unit.name.toLowerCase();
-        if (name.includes('red')) return 'red';
-        if (name.includes('blue')) return 'blue';
+        if (name.includes('red')) { unit._assignedTeam = 'red'; return 'red'; }
+        if (name.includes('blue')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     if (unit.img && unit.img.src) {
         let src = unit.img.src.toLowerCase();
-        if (src.includes('red')) return 'red';
-        if (src.includes('blue')) return 'blue';
+        if (src.includes('red')) { unit._assignedTeam = 'red'; return 'red'; }
+        if (src.includes('blue')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     
-    // 3. Position-based detection (Top half = Red, Bottom half = Blue on an 18x18 grid)
-    if (typeof unit.gridY === 'number') {
-        return unit.gridY < 9 ? 'red' : 'blue';
-    }
-    
-    return 'blue';
+    // 4. Fallback: Stamp based on initial position ONLY ONCE, then cache it to unit._assignedTeam
+    unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue';
+    console.log(`📌 Permanently assigned team '${unit._assignedTeam}' to unit:`, unit.name, `at initial Y: ${unit.gridY}`);
+    return unit._assignedTeam;
 }
 
 function isGoldCore(c, r) {
