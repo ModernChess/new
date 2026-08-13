@@ -95,7 +95,7 @@ canvas.addEventListener('pointerdown', (e) => {
     let touchX = (e.clientX - rect.left) * scaleX;
     let touchY = (e.clientY - rect.top) * scaleY;
 
-    // Check if clicking the large 'X' close button when range mode is active
+    // Check if clicking the top-right 'X' close button when range mode is active
     if (rangeMode) {
         if (touchX >= canvas.width - 60 && touchX <= canvas.width - 15 && touchY >= 15 && touchY <= 60) {
             rangeMode = false;
@@ -118,14 +118,19 @@ canvas.addEventListener('pointerdown', (e) => {
                 rangeMode = false; 
             }, 500); 
         } else {
-            // Check if clicking the large external red button beside a Ship or Artillery
+            // Check if clicking the distant external toggle button for Ship or Artillery
             if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
-                let btnX = selectedUnit.renderX + cellSize + 4;
-                let btnY = selectedUnit.renderY;
-                let btnSize = cellSize * 0.75;
+                let btnX = selectedUnit.renderX + cellSize + 12;
+                let btnY = selectedUnit.renderY - 12;
+                let btnSize = cellSize * 0.85;
+
                 if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
-                    rangeMode = true;
-                    rangeSquares = getUnitCombatRange(selectedUnit);
+                    rangeMode = !rangeMode; // Toggle on/off with the exact same button
+                    if (rangeMode) {
+                        rangeSquares = getUnitCombatRange(selectedUnit);
+                    } else {
+                        rangeSquares = [];
+                    }
                     return;
                 }
             }
@@ -191,7 +196,7 @@ function update() {
                 ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
             });
 
-            // Draw large comfortable 'X' Close Button on canvas
+            // Draw top-right close 'X' button
             ctx.fillStyle = '#e74c3c';
             ctx.fillRect(canvas.width - 60, 15, 45, 45);
             ctx.strokeStyle = '#ffffff';
@@ -211,26 +216,26 @@ function update() {
             ctx.strokeStyle = '#ffff00';
             ctx.lineWidth = 4;
             ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
+        }
 
-            // Draw large comfortable red action button outside/beside the unit
-            if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
-                let btnX = selectedUnit.renderX + cellSize + 4;
-                let btnY = selectedUnit.renderY;
-                let btnSize = cellSize * 0.75;
-                
-                ctx.fillStyle = '#e74c3c';
-                ctx.fillRect(btnX, btnY, btnSize, btnSize);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(btnX, btnY, btnSize, btnSize);
+        // Draw distant external toggle button for Ship or Artillery (shows in both normal and range modes so it can toggle off)
+        if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
+            let btnX = selectedUnit.renderX + cellSize + 12;
+            let btnY = selectedUnit.renderY - 12;
+            let btnSize = cellSize * 0.85;
+            
+            ctx.fillStyle = rangeMode ? '#c0392b' : '#e74c3c';
+            ctx.fillRect(btnX, btnY, btnSize, btnSize);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(btnX, btnY, btnSize, btnSize);
 
-                // Draw target crosshair icon inside the button
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
-                ctx.stroke();
-            }
+            // Crosshair / Toggle icon inside the button
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
+            ctx.stroke();
         }
     }
 
