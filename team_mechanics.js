@@ -3,6 +3,9 @@ let currentTurn = 'blue'; // 'blue' or 'red'
 let blueCoins = 0;
 let redCoins = 0;
 
+// Track animation timestamps for newly captured flags
+let flagAnimations = {}; // key: core.id, value: { startTime, team }
+
 // Precise Gold Cores and their strict Excel-mapped capture zones (g tiles)
 let goldCores = [
     {
@@ -66,12 +69,12 @@ function getTeamFromUnit(unit) {
     return unit._assignedTeam;
 }
 
-// Check if a tile is the exact center core coordinate (units cannot step directly on core centers)
+// Check if a tile is the exact center core coordinate
 function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
-// Check if a unit's landing position triggers capture strictly via its assigned capture zones or direct local adjacency
+// Check capture and trigger smooth planting animation
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
@@ -84,12 +87,15 @@ function checkAndCaptureGold(unit, c, r) {
         
         if (matches && core.owner !== team) {
             core.owner = team;
+            // Trigger animation start time
+            flagAnimations[core.id] = { startTime: performance.now(), team: team };
+
             if (team === 'blue') {
                 blueCoins += 1;
-                console.log(`💰 BLUE captured Gold Core ${core.id} at center (${core.c}, ${core.r})! Blue Coins: ${blueCoins}`);
+                console.log(`💰 BLUE captured Gold Core ${core.id}! Blue Coins: ${blueCoins}`);
             } else {
                 redCoins += 1;
-                console.log(`💰 RED captured Gold Core ${core.id} at center (${core.c}, ${core.r})! Red Coins: ${redCoins}`);
+                console.log(`💰 RED captured Gold Core ${core.id}! Red Coins: ${redCoins}`);
             }
         }
     });
@@ -101,33 +107,53 @@ function tryMoveUnit(unit, newC, newR) {
         return false; 
     }
 
-    // Block stepping directly onto the center core tile itself
     if (isGoldCoreCenter(newC, newR)) {
         return false; 
     }
 
-    // Execute Move
     unit.gridX = newC;
     unit.gridY = newR;
 
-    // Evaluate capture
     checkAndCaptureGold(unit, newC, newR);
 
-    // Switch Turn
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
     return true;
 }
 
 function drawTeamUIAndFlags() {
+    let currentTime = performance.now();
+
     goldCores.forEach(core => {
+        if (!core.owner) return;
+
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
-        // Resized and shifted upwards to stretch into the upper tile as requested
-        if (core.owner === 'blue' && blueFlagLoaded) {
-            ctx.drawImage(blueFlagImg, px, py - cellSize * 0.9, cellSize, cellSize * 1.9);
-        } else if (core.owner === 'red' && redFlagLoaded) {
-            ctx.drawImage(redFlagImg, px, py - cellSize * 0.9, cellSize, cellSize * 1.9);
+        // Significantly taller vertical stretch (height = cellSize * 2.5, shifted far upwards)
+        let targetY = py - cellSize * 1.5;
+        let flagWidth = cellSize;
+        let flagHeight = cellSize * 2.5;
+
+        let anim = flagAnimations[core.id];
+        let renderY = targetY;
+
+        if (anim && anim.team === core.owner) {
+            let elapsed = currentTime - anim.startTime;
+            let duration = 500; // Animation duration in milliseconds (0.5s)
+            
+            if (elapsed < duration) {
+                let progress = elapsed / duration;
+                // Smooth cosine drop-in animation from further above
+                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 2);
+                renderY = targetY - (cellSize * 2) + dropOffset;
+            }
+        }
+
+        let flagImgToDraw = (core.owner === 'blue' && blueFlagLoaded) ? blueFlagImg : 
+                           (core.owner === 'red' && redFlagLoaded) ? redFlagImg : null;
+
+        if (flagImgToDraw) {
+            ctx.drawImage(flagImgToDraw, px, renderY, flagWidth, flagHeight);
         }
     });
 
