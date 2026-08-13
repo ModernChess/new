@@ -77,12 +77,9 @@ function checkAndCaptureGold(unit, c, r) {
     goldCores.forEach(core => {
         let dx = Math.abs(core.c - c);
         let dy = Math.abs(core.r - r);
-        // Only trigger if landing directly within its defined capture zones, 
-        // or immediately adjacent (dx <= 1, dy <= 1) ONLY IF it's genuinely close to this specific core center
         let inDefinedZone = core.captureZones.some(zone => zone.c === c && zone.r === r);
         let isLocalAdjacent = (dx <= 1 && dy <= 1); 
 
-        // For gc5 and gc6 specifically, avoid catching broad area bleed by relying strictly on their explicit captureZones
         let matches = inDefinedZone || (isLocalAdjacent && core.id !== 'gc5' && core.id !== 'gc6');
         
         if (matches && core.owner !== team) {
@@ -126,11 +123,11 @@ function drawTeamUIAndFlags() {
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
-        // Perfectly align and anchor the flag inside the exact center core grid cell
+        // Resized and shifted upwards to stretch into the upper tile as requested
         if (core.owner === 'blue' && blueFlagLoaded) {
-            ctx.drawImage(blueFlagImg, px, py - cellSize * 0.2, cellSize, cellSize * 1.2);
+            ctx.drawImage(blueFlagImg, px, py - cellSize * 0.9, cellSize, cellSize * 1.9);
         } else if (core.owner === 'red' && redFlagLoaded) {
-            ctx.drawImage(redFlagImg, px, py - cellSize * 0.2, cellSize, cellSize * 1.2);
+            ctx.drawImage(redFlagImg, px, py - cellSize * 0.9, cellSize, cellSize * 1.9);
         }
     });
 
