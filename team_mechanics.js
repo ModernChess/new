@@ -3,7 +3,7 @@ let currentTurn = 'blue'; // 'blue' or 'red'
 let blueCoins = 0;
 let redCoins = 0;
 
-// Precise Gold Cores and their Excel-mapped capture zones (g tiles)
+// Precise Gold Cores and their strict Excel-mapped capture zones (g tiles)
 let goldCores = [
     {
         id: 'gc1', c: 12, r: 7, owner: null,
@@ -23,7 +23,7 @@ let goldCores = [
     },
     {
         id: 'gc5', c: 6, r: 4, owner: null,
-        captureZones: [{c:5, r:3}, {c:6, r:3}, {c:7, r:3}, {c:0, r:4}, {c:1, r:4}, {c:2, r:4}, {c:5, r:4}, {c:7, r:4}, {c:0, r:5}, {c:1, r:5}, {c:2, r:5}, {c:5, r:5}, {c:6, r:5}, {c:7, r:5}, {c:0, r:6}, {c:1, r:6}, {c:2, r:6}]
+        captureZones: [{c:5, r:3}, {c:6, r:3}, {c:7, r:3}, {c:5, r:4}, {c:7, r:4}, {c:5, r:5}, {c:6, r:5}, {c:7, r:5}]
     },
     {
         id: 'gc6', c: 1, r: 5, owner: null,
@@ -71,16 +71,21 @@ function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
-// Check if a unit's landing position triggers capture via the 'g' capture zones or adjacent tiles
+// Check if a unit's landing position triggers capture strictly via its assigned capture zones or direct local adjacency
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
-        // Check if landed tile matches core center, capture zones, or any adjacent tile (Chebyshev distance <= 1)
         let dx = Math.abs(core.c - c);
         let dy = Math.abs(core.r - r);
-        let isAdjacentOrZone = (dx <= 1 && dy <= 1) || core.captureZones.some(zone => zone.c === c && zone.r === r);
+        // Only trigger if landing directly within its defined capture zones, 
+        // or immediately adjacent (dx <= 1, dy <= 1) ONLY IF it's genuinely close to this specific core center
+        let inDefinedZone = core.captureZones.some(zone => zone.c === c && zone.r === r);
+        let isLocalAdjacent = (dx <= 1 && dy <= 1); 
+
+        // For gc5 and gc6 specifically, avoid catching broad area bleed by relying strictly on their explicit captureZones
+        let matches = inDefinedZone || (isLocalAdjacent && core.id !== 'gc5' && core.id !== 'gc6');
         
-        if (isAdjacentOrZone && core.owner !== team) {
+        if (matches && core.owner !== team) {
             core.owner = team;
             if (team === 'blue') {
                 blueCoins += 1;
