@@ -5,7 +5,6 @@ let pressTimer = null;
 let rangeMode = false;
 let rangeSquares = [];
 
-// Helper function to get larger grid coordinate (Al-Il, 1l-9l) from 18x18 grid
 function getLargerCoord(c, r) {
     const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
     const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
@@ -16,20 +15,17 @@ function getLargerCoord(c, r) {
     return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
-// Function to calculate Ship (1 square range) or Artillery (3 square rays like a Queen)
 function getUnitCombatRange(unit) {
     let maxDist = (unit.name === 'Ship') ? 1 : (unit.name === 'Artillery' ? 3 : 0);
     if (maxDist === 0) return [];
 
     let currentLg = getLargerCoord(unit.gridX, unit.gridY);
     let results = [];
-
-    // 8 directions (Queen-like ray casting)
     let directions = [
-        {dx: 0, dy: -1}, {dx: 0, dy: 1},  // Up, Down
-        {dx: -1, dy: 0}, {dx: 1, dy: 0},  // Left, Right
-        {dx: -1, dy: -1}, {dx: 1, dy: -1}, // Diagonals up-left, up-right
-        {dx: -1, dy: 1}, {dx: 1, dy: 1}   // Diagonals down-left, down-right
+        {dx: 0, dy: -1}, {dx: 0, dy: 1},  
+        {dx: -1, dy: 0}, {dx: 1, dy: 0},  
+        {dx: -1, dy: -1}, {dx: 1, dy: -1}, 
+        {dx: -1, dy: 1}, {dx: 1, dy: 1}   
     ];
 
     directions.forEach(dir => {
@@ -38,15 +34,12 @@ function getUnitCombatRange(unit) {
             let nr = currentLg.rowIdx + (dir.dy * step);
             if (nc >= 0 && nc < 9 && nr >= 0 && nr < 9) {
                 results.push({
-                    startC: nc * 2,
-                    startR: nr * 2,
-                    endC: nc * 2 + 1,
-                    endR: nr * 2 + 1
+                    startC: nc * 2, startR: nr * 2,
+                    endC: nc * 2 + 1, endR: nr * 2 + 1
                 });
             }
         }
     });
-
     return results;
 }
 
@@ -69,10 +62,14 @@ function getLegalMoves(unit) {
             let nr = cy + (dir.dy * step);
 
             if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
+                if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) {
+                    break;
+                }
+
                 let terrain = getTerrain(nc, nr);
                 let isWater = isWaterTerrain(terrain);
-
                 let validTerrain = false;
+
                 if (unit.type === 'land' && !isWater) validTerrain = true;
                 if (unit.type === 'water' && isWater) validTerrain = true;
 
@@ -83,7 +80,6 @@ function getLegalMoves(unit) {
             }
         }
     });
-
     return moves;
 }
 
@@ -102,6 +98,11 @@ canvas.addEventListener('pointerdown', (e) => {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
 
         if (clickedUnit) {
+            let unitTeam = getTeamFromUnit(clickedUnit);
+            if (unitTeam !== currentTurn) {
+                return; // Cannot select opponent units on wrong turn
+            }
+
             pressTimer = setTimeout(() => {
                 selectedUnit = clickedUnit;
                 legalMoves = getLegalMoves(clickedUnit);
@@ -109,19 +110,14 @@ canvas.addEventListener('pointerdown', (e) => {
                 rangeMode = false; 
             }, 500); 
         } else {
-            // Check if clicking the distant external toggle button for Ship or Artillery
             if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
                 let btnX = selectedUnit.renderX + cellSize + 12;
                 let btnY = selectedUnit.renderY - 12;
                 let btnSize = cellSize * 0.85;
 
                 if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
-                    rangeMode = !rangeMode; // Toggle on/off with the exact same button
-                    if (rangeMode) {
-                        rangeSquares = getUnitCombatRange(selectedUnit);
-                    } else {
-                        rangeSquares = [];
-                    }
+                    rangeMode = !rangeMode; 
+                    rangeSquares = rangeMode ? getUnitCombatRange(selectedUnit) : [];
                     return;
                 }
             }
@@ -130,11 +126,15 @@ canvas.addEventListener('pointerdown', (e) => {
                 let isLegal = legalMoves.some(m => m.c === c && m.r === r);
                 if (isLegal) {
                     if (targetTile && targetTile.c === c && targetTile.r === r) {
-                        selectedUnit.gridX = c;
-                        selectedUnit.gridY = r;
-                        selectedUnit = null;
-                        legalMoves = [];
-                        targetTile = null;
+                        
+                        // PASS MOVE TO TEAM MECHANICS
+                        let success = tryMoveUnit(selectedUnit, c, r);
+                        if (success) {
+                            selectedUnit = null;
+                            legalMoves = [];
+                            targetTile = null;
+                        }
+
                     } else {
                         targetTile = { c: c, r: r };
                     }
@@ -157,6 +157,11 @@ function update() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
+    // DRAW HUD & TEAM FLAGS OVERLAY
+    if (typeof drawTeamUIAndFlags === 'function') {
+        drawTeamUIAndFlags();
+    }
+
     units.forEach(u => {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
@@ -174,10 +179,9 @@ function update() {
         ctx.fill();
     });
 
-    // Render Selection, Movement Outlines, or White Range Outlines
     if (selectedUnit) {
         if (rangeMode) {
-            ctx.strokeStyle = '#ffffff'; // White outline for range
+            ctx.strokeStyle = '#ffffff'; 
             ctx.lineWidth = 3.5;
             rangeSquares.forEach(sq => {
                 let px = sq.startC * cellSize;
@@ -186,7 +190,6 @@ function update() {
                 let pHeight = (sq.endR - sq.startR + 1) * cellSize;
                 ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
             });
-
         } else {
             ctx.strokeStyle = '#ff8000';
             ctx.lineWidth = 3;
@@ -199,7 +202,6 @@ function update() {
             ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
         }
 
-        // Draw distant external toggle button for Ship or Artillery (shows in both normal and range modes so it can toggle off)
         if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
             let btnX = selectedUnit.renderX + cellSize + 12;
             let btnY = selectedUnit.renderY - 12;
@@ -211,9 +213,6 @@ function update() {
             ctx.lineWidth = 2;
             ctx.strokeRect(btnX, btnY, btnSize, btnSize);
 
-            // Crosshair / Toggle icon inside the button
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(btnX + btnSize / 2, btnY + btnSize / 2, btnSize * 0.25, 0, Math.PI * 2);
             ctx.stroke();
