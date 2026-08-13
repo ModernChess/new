@@ -90,7 +90,6 @@ function areUnitsConnected(u1, u2) {
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
-// Extended Superunit calculation incorporating Enemy-Bridged Proxy Connections
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u));
     let enemyUnits = allUnits.filter(u => getTeamFromUnit(u) !== teamName && !isSpecialUnit(u));
@@ -108,7 +107,6 @@ function getSuperunitsForTeam(teamName, allUnits) {
             let curr = queue.shift();
             group.push(curr);
 
-            // 1. Direct friendly connections
             teamUnits.forEach(other => {
                 if (!visited.has(other) && areUnitsConnected(curr, other)) {
                     visited.add(other);
@@ -116,10 +114,8 @@ function getSuperunitsForTeam(teamName, allUnits) {
                 }
             });
 
-            // 2. Proxy Bridge Connections through adjacent enemy units
             teamUnits.forEach(other => {
                 if (!visited.has(other)) {
-                    // Check if there is an enemy unit bridging them (both friendly units touch the same enemy)
                     let bridgedByEnemy = enemyUnits.some(eUnit => areUnitsConnected(curr, eUnit) && areUnitsConnected(other, eUnit));
                     if (bridgedByEnemy) {
                         visited.add(other);
@@ -250,7 +246,7 @@ function tryMoveUnit(unit, newC, newR) {
 }
 
 // =========================================================================
-// RENDER FUNCTION: MUST BE CALLED AFTER MAIN UNITS DRAWING LOOP IN YOUR APP
+// RENDER FUNCTION WITH MAP-CENTER ORIENTED OFFSET POWER LABELS
 // =========================================================================
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
@@ -283,7 +279,7 @@ function drawTeamUIAndFlags() {
         ctx.restore();
     });
 
-    // 2. Render Gold Core Flags (Absolute Top Layer)
+    // 2. Render Gold Core Flags
     goldCores.forEach(core => {
         if (!core.owner) return;
         let px = core.c * cellSize;
@@ -313,7 +309,10 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    // 3. Render Power Badges & Stalemate Locks (Absolute Top Layer, Un-overshadowed)
+    // 3. Render Power Badges with Significant Inward Offset (Towards Map Center)
+    let mapCenterX = (ctx.canvas.width / 2);
+    let mapCenterY = (ctx.canvas.height / 2);
+
     ['blue', 'red'].forEach(team => {
         let superunits = getSuperunitsForTeam(team, units);
         let opposingTeam = team === 'blue' ? 'red' : 'blue';
@@ -337,29 +336,47 @@ function drawTeamUIAndFlags() {
             if (isLocked) labelText += ' 🔒';
 
             if (labelText.trim() !== '') {
+                // Calculate direction vector pointing from unit cluster towards the map center
+                let dirX = mapCenterX - (avgX + cellSize / 2);
+                let dirY = mapCenterY - (avgY + cellSize / 2);
+                let length = Math.sqrt(dirX * dirX + dirY * dirY);
+                
+                let offsetX = 0;
+                let offsetY = 0;
+                let significantDistance = cellSize * 1.8; // Significant safe distance away from units
+
+                if (length > 0) {
+                    offsetX = (dirX / length) * significantDistance;
+                    offsetY = (dirY / length) * significantDistance;
+                } else {
+                    offsetY = -significantDistance; // Fallback default upward offset if dead center
+                }
+
+                let tagCenterX = avgX + (cellSize / 2) + offsetX;
+                let tagCenterY = avgY + (cellSize / 2) + offsetY;
+
                 ctx.save();
-                ctx.font = 'bold 14px sans-serif';
+                ctx.font = 'bold 15px sans-serif';
                 
                 let textMetrics = ctx.measureText(labelText);
-                let paddingX = 8;
-                let paddingY = 5;
+                let paddingX = 10;
                 let tagWidth = textMetrics.width + paddingX * 2;
-                let tagHeight = 22;
-                let tagX = avgX + (cellSize / 2) - (tagWidth / 2);
-                let tagY = avgY - tagHeight - 6;
+                let tagHeight = 26;
+                let tagX = tagCenterX - (tagWidth / 2);
+                let tagY = tagCenterY - (tagHeight / 2);
 
                 ctx.fillStyle = '#cc0000';
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 2.5;
                 ctx.beginPath();
-                ctx.roundRect(tagX, tagY, tagWidth, tagHeight, 4);
+                ctx.roundRect(tagX, tagY, tagWidth, tagHeight, 6);
                 ctx.fill();
                 ctx.stroke();
 
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(labelText, tagX + tagWidth / 2, tagY + tagHeight / 2);
+                ctx.fillText(labelText, tagCenterX, tagCenterY);
                 ctx.restore();
             }
         });
