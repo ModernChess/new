@@ -95,15 +95,6 @@ canvas.addEventListener('pointerdown', (e) => {
     let touchX = (e.clientX - rect.left) * scaleX;
     let touchY = (e.clientY - rect.top) * scaleY;
 
-    // Check if clicking the top-right 'X' close button when range mode is active
-    if (rangeMode) {
-        if (touchX >= canvas.width - 60 && touchX <= canvas.width - 15 && touchY >= 15 && touchY <= 60) {
-            rangeMode = false;
-            rangeSquares = [];
-            return;
-        }
-    }
-
     let c = Math.floor(touchX / cellSize);
     let r = Math.floor(touchY / cellSize);
 
@@ -195,16 +186,6 @@ function update() {
                 let pHeight = (sq.endR - sq.startR + 1) * cellSize;
                 ctx.strokeRect(px + 2, py + 2, pWidth - 4, pHeight - 4);
             });
-
-            // Draw top-right close 'X' button
-            ctx.fillStyle = '#e74c3c';
-            ctx.fillRect(canvas.width - 60, 15, 45, 45);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(canvas.width - 60, 15, 45, 45);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.fillText('X', canvas.width - 43, 47);
 
         } else {
             ctx.strokeStyle = '#ff8000';
