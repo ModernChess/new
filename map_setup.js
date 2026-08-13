@@ -196,26 +196,64 @@ function spawnTeam(team) {
     let shipImgRef = isBlue ? blueShipImg : redShipImg;
     let shipLoadRef = () => isBlue ? blueShipLoaded : redShipLoaded;
 
+    // Ship spawns at the port
     units.push({ name: 'Ship', type: 'water', range: 2, gridX: port.c, gridY: port.r, x: port.c*cellSize, y: port.r*cellSize, img: shipImgRef, loaded: shipLoadRef });
 
-    function getUniqueBasePos() {
-        let available = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
-        if (available.length === 0) return baseSquares[0];
-        let idx = Math.floor(Math.random() * available.length);
-        return available[idx];
+    // Helper to find a free spawn position starting from base squares and expanding outward into valid land tiles
+    function getAvailableLandPos() {
+        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
+        if (availableBase.length > 0) {
+            return availableBase[Math.floor(Math.random() * availableBase.length)];
+        }
+
+        let core = baseSquares.find(b => getTerrain(b.c, b.r).includes('core')) || baseSquares[0];
+        let queue = [core];
+        let visited = new Set([`${core.c},${core.r}`]);
+
+        while (queue.length > 0) {
+            let curr = queue.shift();
+
+            if (!units.some(u => u.gridX === curr.c && u.gridY === curr.r)) {
+                let t = getTerrain(curr.c, curr.r);
+                if (!isWaterTerrain(t)) {
+                    return curr;
+                }
+            }
+
+            let neighbors = [
+                {c: curr.c, r: curr.r - 1},
+                {c: curr.c, r: curr.r + 1},
+                {c: curr.c - 1, r: curr.r},
+                {c: curr.c + 1, r: curr.r}
+            ];
+
+            for (let n of neighbors) {
+                if (n.c >= 0 && n.c < cols && n.r >= 0 && n.r < rows) {
+                    let key = `${n.c},${n.r}`;
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+        return baseSquares[0];
     }
 
+    // Spawn 3 Tanks
     for (let i = 0; i < 3; i++) {
-        let pos = getUniqueBasePos();
+        let pos = getAvailableLandPos();
         units.push({ name: 'Tank', type: 'land', range: 3, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: tankImgRef, loaded: tankLoadRef });
     }
 
+    // Spawn 5 Infantry
     for (let i = 0; i < 5; i++) {
-        let pos = getUniqueBasePos();
+        let pos = getAvailableLandPos();
         units.push({ name: 'Infantry', type: 'land', range: 2, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: infImgRef, loaded: infLoadRef });
     }
 
-    let artPos = getUniqueBasePos();
+    // Spawn 1 Artillery
+    let artPos = getAvailableLandPos();
     units.push({ name: 'Artillery', type: 'land', range: 2, gridX: artPos.c, gridY: artPos.r, x: artPos.c*cellSize, y: artPos.r*cellSize, img: artImgRef, loaded: artLoadRef });
 }
 
