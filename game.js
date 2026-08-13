@@ -118,52 +118,42 @@ loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoad
 loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
 
 function getTerrain(c, r) {
-    // Gold Cores & Gold Squares
-    if (c >= 5 && c <= 7 && r >= 3 && r <= 4) {
-        if (c === 6 && r === 4) return 'gold_core';
-        return 'gold';
-    }
-    if (c >= 0 && c <= 2 && r >= 4 && r <= 6) {
-        if (c === 1 && r === 5) return 'gold_core';
-        return 'gold';
-    }
-    if (c >= 11 && c <= 13 && r >= 6 && r <= 8) {
-        if (c === 12 && r === 7) return 'gold_core';
-        return 'gold';
-    }
-    if (c >= 3 && c <= 5 && r >= 13 && r <= 15) {
-        if (c === 4 && r === 14) return 'gold_core';
-        return 'gold';
-    }
-    if (c >= 10 && c <= 12 && r >= 15 && r <= 17) {
-        if (c === 11 && r === 16) return 'gold_core';
-        return 'gold';
-    }
-    if (c >= 15 && c <= 17 && r >= 11 && r <= 13) {
-        if (c === 16 && r === 12) return 'gold_core';
-        return 'gold';
-    }
+    // Convert 0-indexed column and row to Excel style (e.g. c=0, r=0 -> A1)
+    const colChar = String.fromCharCode(65 + c);
+    const rowNum = r + 1;
+    const coord = colChar + rowNum;
 
-    // Water Cluster
-    if (c >= 4 && c <= 13 && r >= 4 && r <= 13) {
-        return 'water';
-    }
+    // Water
+    const waterList = [
+        'I5', 'J5', 'I6', 'J6', 'K6', 'H7', 'I7', 'J7', 'K7', 'G8', 'H8', 'I8', 'J8', 'K8', 
+        'E9', 'F9', 'G9', 'H9', 'I9', 'J9', 'K9', 'L9', 'E10', 'F10', 'G10', 'H10', 'I10', 
+        'J10', 'K10', 'L10', 'F11', 'G11', 'H11', 'I11', 'J11', 'K11', 'L11', 'M11', 'I12', 
+        'J12', 'K12', 'L12', 'M12', 'N12', 'K13', 'L13', 'M13', 'N13', 'L14', 'M14', 'N14'
+    ];
+    if (waterList.includes(coord)) return 'water';
 
-    // Blue Team
-    if (c >= 0 && c <= 1 && r >= 10 && r <= 12) {
-        if (c === 1 && r === 11) return 'blue_core';
-        return 'blue_base';
-    }
+    // Navy Docks
+    if (coord === 'F12') return 'blue_navy';
+    if (coord === 'L6') return 'red_navy';
 
-    // Red Team
-    if (c >= 10 && c <= 12 && r >= 0 && r <= 1.2) {
-        if (c === 11 && r === 0) return 'red_core';
-        return 'red_base';
-    }
+    // Team Bases & Cores
+    if (coord === 'A12') return 'blue_core';
+    if (coord === 'A11' || coord === 'B11' || coord === 'B12' || coord === 'A13' || coord === 'B13') return 'blue_base';
 
-    // Navy Docks (Blue dock near blue base, Red dock near red base)
-    if (c === 3 && r === 11) return 'blue_navy';
-    if (c === 11 && r === 5) return 'red_navy';
+    if (coord === 'L1') return 'red_core';
+    if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
+
+    // Gold Mines & Cores
+    const goldCores = ['G5', 'B6', 'M8', 'F15', 'Q13', 'L17'];
+    if (goldCores.includes(coord)) return 'gold_core';
+
+    const goldList = [
+        'F4', 'G4', 'H4', 'A5', 'B5', 'C5', 'F5', 'H5', 'A6', 'C6', 'F6', 'G6', 'H6', 
+        'A7', 'B7', 'C7', 'L7', 'M7', 'N7', 'L8', 'N8', 'M9', 'N9', 'P12', 'Q12', 'R12', 
+        'P13', 'R13', 'E14', 'F14', 'G14', 'P14', 'Q14', 'R14', 'E15', 'G15', 'E16', 'F16', 
+        'G16', 'K16', 'L16', 'M16', 'K17', 'M17', 'K18', 'L18', 'M18'
+    ];
+    if (goldList.includes(coord)) return 'gold';
 
     return 'land';
 }
