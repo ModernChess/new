@@ -69,7 +69,7 @@ function getTeamFromUnit(unit) {
     return unit._assignedTeam;
 }
 
-// Get intrinsic power of a unit: Infantry = 1, Tank = 2 (others default to 1)
+// Get intrinsic power of a unit: Infantry = 1, Tank = 2
 function getUnitPower(unit) {
     if (!unit) return 0;
     if (unit.power !== undefined) return unit.power;
@@ -118,6 +118,37 @@ function getSuperunitsForTeam(teamName, allUnits) {
     return superunits;
 }
 
+// Continuous check for combat interactions (destructions and deadlocks) across the board
+function resolveUnitInteractions() {
+    let blueSupers = getSuperunitsForTeam('blue', units);
+    let redSupers = getSuperunitsForTeam('red', units);
+
+    // Check interactions between opposing superunits
+    blueSupers.forEach(bSu => {
+        redSupers.forEach(rSu => {
+            // Check if any unit in blue superunit is adjacent/connected to any unit in red superunit
+            let isTouching = bSu.units.some(bUnit => 
+                rSu.units.some(rUnit => areUnitsConnected(bUnit, rUnit) || (bUnit.gridX === rUnit.gridX && bUnit.gridY === rUnit.gridY))
+            );
+
+            if (isTouching) {
+                if (bSu.power > rSu.power) {
+                    // Blue is stronger -> Destroy all units in the Red superunit!
+                    console.log(`💥 Red superunit (Power ${rSu.power}) destroyed by Blue superunit (Power ${bSu.power})!`);
+                    units = units.filter(u => !rSu.units.includes(u));
+                } else if (rSu.power > bSu.power) {
+                    // Red is stronger -> Destroy all units in the Blue superunit!
+                    console.log(`💥 Blue superunit (Power ${bSu.power}) destroyed by Red superunit (Power ${rSu.power})!`);
+                    units = units.filter(u => !bSu.units.includes(u));
+                } else {
+                    // Powers are equal -> Deadlock / Stalemate (Units stay locked, no one dies)
+                    // Movement blocking handled in tryMoveUnit
+                }
+            }
+        });
+    });
+}
+
 // Check if a tile is the exact center core coordinate
 function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
@@ -147,53 +178,47 @@ function checkAndCaptureGold(unit, c, r) {
     });
 }
 
-// Combat Resolution: Pure Power Comparison
+// Combat Resolution on Movement & Deadlock Prevention
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     if (unitTeam !== currentTurn) return false; 
 
     if (isGoldCoreCenter(newC, newR)) return false; 
 
-    // Check if target tile has an enemy unit
-    let enemyUnit = units.find(u => u.gridX === newC && u.gridY === newR && getTeamFromUnit(u) !== unitTeam);
-
-    if (enemyUnit) {
-        // Calculate Attacking Superunit Power
-        let attackerSuperunits = getSuperunitsForTeam(unitTeam, units);
-        let attackingGroup = attackerSuperunits.find(su => su.units.includes(unit));
-        let attackingPower = attackingGroup ? attackingGroup.power : getUnitPower(unit);
-
-        // Calculate Defending Superunit Power
-        let defenderTeam = getTeamFromUnit(enemyUnit);
-        let defenderSuperunits = getSuperunitsForTeam(defenderTeam, units);
-        let defendingGroup = defenderSuperunits.find(su => su.units.includes(enemyUnit));
-        let defendingPower = defendingGroup ? defendingGroup.power : getUnitPower(enemyUnit);
-
-        console.log(`⚔️ COMBAT: Attacker Power (${attackingPower}) vs Defender Power (${defendingPower})`);
-
-        if (attackingPower > defendingPower) {
-            // Attacker is stronger -> Enemy unit is instantly destroyed!
-            units = units.filter(u => u !== enemyUnit);
-            console.log(`💥 Defender destroyed due to lower power!`);
-        } else if (attackingPower < defendingPower) {
-            // Attacker is weaker -> Attacking unit gets instantly destroyed!
-            units = units.filter(u => u !== unit);
-            console.log(`💥 Attacker destroyed due to lower power!`);
-            currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
-            return false;
-        } else {
-            // Powers are equal -> Deadlock / Stalemate (neither moves or dies)
-            console.log(`🛡️ DEADLOCK / STALEMATE: Equal power blocks action.`);
-            return false;
-        }
-    }
-
-    // Execute Move
+    // Temporarily test the move to check power balances
+    let oldX = unit.gridX;
+    let oldY = unit.gridY;
     unit.gridX = newC;
     unit.gridY = newR;
 
-    // Evaluate gold capture
+    let blueSupers = getSuperunitsForTeam('blue', units);
+    let redSupers = getSuperunitsForTeam('red', units);
+
+    let isBlockedByDeadlock = false;
+
+    // Evaluate if this move results in a deadlock (equal power clash preventing movement)
+    blueSupers.forEach(bSu => {
+        redSupers.forEach(rSu => {
+            let isTouching = bSu.units.some(bU => rSu.units.some(rU => areUnitsConnected(bU, rU)));
+            if (isTouching && bSu.power === rSu.power) {
+                isBlockedByDeadlock = true;
+            }
+        });
+    });
+
+    if (isBlockedByDeadlock) {
+        // Revert move due to deadlock/stalemate balance
+        unit.gridX = oldX;
+        unit.gridY = oldY;
+        console.log(`🛡️ DEADLOCK: Move blocked due to equal power balance.`);
+        return false;
+    }
+
+    // Execute Move permanently
     checkAndCaptureGold(unit, newC, newR);
+
+    // Run board-wide interaction/destruction check
+    resolveUnitInteractions();
 
     // Switch Turn
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
@@ -203,6 +228,9 @@ function tryMoveUnit(unit, newC, newR) {
 // Render UI, Flags, and Floating Superunit Power Labels
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
+
+    // Run interaction checks continuously during render updates
+    resolveUnitInteractions();
 
     // Draw Gold Core Flags
     goldCores.forEach(core => {
