@@ -71,14 +71,16 @@ function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
-// Check if a unit's landing position triggers capture via the 'g' capture zones
+// Check if a unit's landing position triggers capture via the 'g' capture zones or adjacent tiles
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
-        // Check if the landed tile (c, r) matches the center core or any of its designated 'g' capture zones
-        let inZone = (core.c === c && core.r === r) || core.captureZones.some(zone => zone.c === c && zone.r === r);
+        // Check if landed tile matches core center, capture zones, or any adjacent tile (Chebyshev distance <= 1)
+        let dx = Math.abs(core.c - c);
+        let dy = Math.abs(core.r - r);
+        let isAdjacentOrZone = (dx <= 1 && dy <= 1) || core.captureZones.some(zone => zone.c === c && zone.r === r);
         
-        if (inZone && core.owner !== team) {
+        if (isAdjacentOrZone && core.owner !== team) {
             core.owner = team;
             if (team === 'blue') {
                 blueCoins += 1;
@@ -92,20 +94,13 @@ function checkAndCaptureGold(unit, c, r) {
 }
 
 function tryMoveUnit(unit, newC, newR) {
-    console.log(`\n--- ATTEMPTING MOVE ---`);
-    console.log(`Current Turn State: ${currentTurn}`);
-    
     let unitTeam = getTeamFromUnit(unit);
-    console.log(`Moving Unit Team detected as: ${unitTeam}`);
-
     if (unitTeam !== currentTurn) {
-        console.error(`❌ BLOCKED: Tried to move a ${unitTeam} unit, but it is currently ${currentTurn}'s turn!`);
         return false; 
     }
 
     // Block stepping directly onto the center core tile itself
     if (isGoldCoreCenter(newC, newR)) {
-        console.error(`❌ BLOCKED: Cannot step directly onto a gold core center tile!`);
         return false; 
     }
 
@@ -113,15 +108,11 @@ function tryMoveUnit(unit, newC, newR) {
     unit.gridX = newC;
     unit.gridY = newR;
 
-    // Evaluate capture based on Excel 'g' zones
+    // Evaluate capture
     checkAndCaptureGold(unit, newC, newR);
 
     // Switch Turn
-    let previousTurn = currentTurn;
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
-    console.log(`🔄 Turn Switched: ${previousTurn.toUpperCase()} ➡️ ${currentTurn.toUpperCase()}`);
-    console.log(`-------------------------\n`);
-    
     return true;
 }
 
@@ -130,11 +121,11 @@ function drawTeamUIAndFlags() {
         let px = core.c * cellSize;
         let py = core.r * cellSize;
 
-        // Plant the flag on the exact center core coordinate when owned
+        // Perfectly align and anchor the flag inside the exact center core grid cell
         if (core.owner === 'blue' && blueFlagLoaded) {
-            ctx.drawImage(blueFlagImg, px + cellSize * 0.25, py - cellSize * 0.5, cellSize * 0.5, cellSize * 1.4);
+            ctx.drawImage(blueFlagImg, px, py - cellSize * 0.2, cellSize, cellSize * 1.2);
         } else if (core.owner === 'red' && redFlagLoaded) {
-            ctx.drawImage(redFlagImg, px + cellSize * 0.25, py - cellSize * 0.5, cellSize * 0.5, cellSize * 1.4);
+            ctx.drawImage(redFlagImg, px, py - cellSize * 0.2, cellSize, cellSize * 1.2);
         }
     });
 
