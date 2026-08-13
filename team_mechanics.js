@@ -1,4 +1,3 @@
-
 // --- TEAM & TURN STATE ---
 let currentTurn = 'blue'; // 'blue' or 'red'
 let blueCoins = 0;
@@ -25,10 +24,25 @@ redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red
 let redFlagLoaded = false;
 redFlagImg.onload = () => { redFlagLoaded = true; };
 
+// Foolproof team detection
 function getTeamFromUnit(unit) {
-    if (unit.team) return unit.team;
-    if (unit.name && unit.name.toLowerCase().includes('red')) return 'red';
-    if (unit.img && unit.img.src && unit.img.src.toLowerCase().includes('red')) return 'red';
+    if (!unit) return 'blue';
+    if (unit.team) return unit.team.toLowerCase();
+    
+    // Check image source string (e.g. blue_tank.jpg vs red_tank.jpg)
+    if (unit.img && unit.img.src) {
+        let src = unit.img.src.toLowerCase();
+        if (src.includes('red')) return 'red';
+        if (src.includes('blue')) return 'blue';
+    }
+    
+    // Check unit name property
+    if (unit.name) {
+        let name = unit.name.toLowerCase();
+        if (name.includes('red')) return 'red';
+        if (name.includes('blue')) return 'blue';
+    }
+    
     return 'blue';
 }
 
@@ -51,9 +65,9 @@ function checkAndCaptureGold(unit, c, r) {
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
     
-    // Validate turn
+    // Strict turn validation: Block movement if it's not this team's turn
     if (unitTeam !== currentTurn) {
-        console.log(`Blocked: It is ${currentTurn}'s turn, not ${unitTeam}'s!`);
+        console.log(`Action Denied: Attempted to move ${unitTeam} unit, but it is ${currentTurn}'s turn!`);
         return false; 
     }
 
@@ -68,8 +82,9 @@ function tryMoveUnit(unit, newC, newR) {
 
     checkAndCaptureGold(unit, newC, newR);
 
-    // Switch Turn
+    // Switch Turn successfully
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
+    console.log(`Turn successfully switched to: ${currentTurn}`);
     return true;
 }
 
@@ -102,4 +117,3 @@ function drawTeamUIAndFlags() {
     ctx.fillText(`Red Coins: ${redCoins}`, 120, 48);
     ctx.restore();
 }
-
