@@ -58,7 +58,8 @@ function getTeamFromUnit(unit) {
 function getUnitPower(unit) {
     if (!unit) return 0;
     let name = (unit.name || '').toLowerCase();
-    if (name.includes('artillery') || name.includes('ship') || name.includes('boat')) return 0;
+    if (name.includes('ship')) return Infinity; // Ships have infinite power to destroy anything
+    if (name.includes('artillery') || name.includes('boat')) return 0;
     if (name.includes('tank')) return 2;
     if (name.includes('infantry') || name.includes('soldier')) return 1;
     return 1;
@@ -67,7 +68,7 @@ function getUnitPower(unit) {
 function isSpecialUnit(unit) {
     if (!unit) return false;
     let name = (unit.name || '').toLowerCase();
-    return name.includes('artillery') || name.includes('ship') || name.includes('boat') || getUnitPower(unit) === 0;
+    return name.includes('artillery') || name.includes('boat') || (getUnitPower(unit) === 0);
 }
 
 // Evaluates Chebyshev connectivity distance between units
@@ -80,8 +81,8 @@ function areUnitsAdjacent(u1, u2) {
 // Groups team combat units into clusters/superunits including proxy bridge heuristics
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
-    let combatUnits = teamUnits.filter(u => !isSpecialUnit(u));
-    let specialUnits = teamUnits.filter(u => isSpecialUnit(u));
+    let combatUnits = teamUnits.filter(u => !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
+    let specialUnits = teamUnits.filter(u => isSpecialUnit(u) || getUnitPower(u) === Infinity);
     let superunits = [];
     let visited = new Set();
 
@@ -134,7 +135,7 @@ function getSuperunitsForTeam(teamName, allUnits) {
 }
 
 function isUnitLockedInStalemate(unit, allUnits) {
-    if (isSpecialUnit(unit)) return false;
+    if (isSpecialUnit(unit) || getUnitPower(unit) === Infinity) return false;
     let team = getTeamFromUnit(unit);
     let enemyTeam = team === 'blue' ? 'red' : 'blue';
     let mySuList = getSuperunitsForTeam(team, allUnits);
@@ -166,7 +167,7 @@ function queueForDisintegration(unitList) {
     });
 }
 
-// Evaluates combat interactions and passive ship range destruction rules
+// Evaluates combat interactions and infinite passive ship range destruction rules
 function resolveUnitInteractions(allUnits) {
     let blueSuList = getSuperunitsForTeam('blue', allUnits);
     let redSuList = getSuperunitsForTeam('red', allUnits);
@@ -186,7 +187,7 @@ function resolveUnitInteractions(allUnits) {
         });
     });
 
-    // 2. Passive automatic ship range destruction rule
+    // 2. Passive automatic infinite ship range strike rule
     allUnits.forEach(ship => {
         let shipTeam = getTeamFromUnit(ship);
         let shipName = (ship.name || '').toLowerCase();
@@ -201,7 +202,7 @@ function resolveUnitInteractions(allUnits) {
                     );
                     if (inRange) {
                         unitsToDestroy.add(targetUnit);
-                        TeamLog.success(`Ship passive range strike! Target unit ${targetUnit.name} caught in ship range zone.`);
+                        TeamLog.success(`Infinite Ship Range Strike! Target unit ${targetUnit.name} vaporized within ship range zone.`);
                     }
                 }
             });
@@ -243,9 +244,27 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Master HUD and flag rendering pass
+// Master HUD, Turn Info, and flag rendering pass
 function drawTeamUIAndFlags() {
     let now = performance.now();
+
+    // Render turn & coin HUD overlay back on screen
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.fillRect(12, 12, 160, 60);
+    ctx.strokeRect(12, 12, 160, 60);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Turn: ${currentTurn.toUpperCase()}`, 24, 20);
+    ctx.fillStyle = '#3498db';
+    ctx.fillText(`Blue Coins: ${blueCoins}`, 24, 38);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText(`Red Coins: ${redCoins}`, 24, 54);
+
     goldCores.forEach(core => {
         let cx = core.c * cellSize + cellSize / 2;
         let cy = core.r * cellSize + cellSize / 2;
@@ -299,20 +318,21 @@ function drawTeamUIAndFlags() {
             let offsetX = (dirX / length) * significantDistance;
             let offsetY = (dirY / length) * significantDistance;
 
-            let badgeX = avgX + cellSize / 2 + offsetX - 18;
+            let badgeX = avgX + cellSize / 2 + offsetX - 22;
             let badgeY = avgY + cellSize / 2 + offsetY - 12;
 
             ctx.fillStyle = '#cc0000';
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2.5;
+            let powerDisplay = su.power === Infinity ? '∞' : su.power;
             if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.roundRect(badgeX, badgeY, 36, 24, 6);
+                ctx.roundRect(badgeX, badgeY, 44, 24, 6);
                 ctx.fill();
                 ctx.stroke();
             } else {
-                ctx.fillRect(badgeX, badgeY, 36, 24);
-                ctx.strokeRect(badgeX, badgeY, 36, 24);
+                ctx.fillRect(badgeX, badgeY, 44, 24);
+                ctx.strokeRect(badgeX, badgeY, 44, 24);
             }
 
             ctx.fillStyle = '#ffffff';
@@ -320,7 +340,7 @@ function drawTeamUIAndFlags() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             let lockedText = su.units.some(u => isUnitLockedInStalemate(u, units)) ? ' 🔒' : '';
-            ctx.fillText(`${su.power}${lockedText}`, badgeX + 18, badgeY + 12);
+            ctx.fillText(`${powerDisplay}${lockedText}`, badgeX + 22, badgeY + 12);
         });
     });
 
