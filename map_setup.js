@@ -191,7 +191,7 @@ function isWaterTerrain(terrain) {
     return terrain === 'water' || terrain === 'blue_navy' || terrain === 'red_navy';
 }
 
-// Global array holding active game units
+// Global array holding active game units - modified to start with a LONE INFANTRY per team
 let units = [];
 
 // Retrieves array of coordinates corresponding to a team's base and core structures
@@ -220,83 +220,30 @@ function getPortSquare(team) {
     return {c:0, r:0};
 }
 
-// Spawns initial combat units and ships for a specific team across valid board tiles
+// Spawns initial units: modified so each side begins with just a lone infantry unit instead of the full army
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
-    let port = getPortSquare(team);
+    let startPos = baseSquares.length > 0 ? baseSquares[0] : {c: isBlue ? 0 : 11, r: isBlue ? 11 : 0};
 
-    let tankImgRef = isBlue ? blueTankImg : redTankImg;
-    let tankLoadRef = () => isBlue ? blueTankLoaded : redTankLoaded;
     let infImgRef = isBlue ? blueInfantryImg : redInfantryImg;
     let infLoadRef = () => isBlue ? blueInfantryLoaded : redInfantryLoaded;
-    let artImgRef = isBlue ? blueArtilleryImg : redArtilleryImg;
-    let artLoadRef = () => isBlue ? blueArtilleryLoaded : redArtilleryLoaded;
-    let shipImgRef = isBlue ? blueShipImg : redShipImg;
-    let shipLoadRef = () => isBlue ? blueShipLoaded : redShipLoaded;
 
-    // Spawns navy ship directly at the team's designated port square
-    units.push({ name: 'Ship', type: 'water', range: 2, gridX: port.c, gridY: port.r, x: port.c*cellSize, y: port.r*cellSize, img: shipImgRef, loaded: shipLoadRef });
+    // Game begins with a lone infantry per side
+    units.push({ 
+        name: 'Infantry', 
+        type: 'land', 
+        range: 2, 
+        gridX: startPos.c, 
+        gridY: startPos.r, 
+        x: startPos.c * cellSize, 
+        y: startPos.r * cellSize, 
+        img: infImgRef, 
+        loaded: infLoadRef,
+        team: team 
+    });
 
-    // Breadth-first search helper to find unoccupied land spawn positions starting from bases
-    function getAvailableLandPos() {
-        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
-        if (availableBase.length > 0) {
-            return availableBase[Math.floor(Math.random() * availableBase.length)];
-        }
-
-        let core = baseSquares.find(b => getTerrain(b.c, b.r).includes('core')) || baseSquares[0];
-        let queue = [core];
-        let visited = new Set([`${core.c},${core.r}`]);
-
-        while (queue.length > 0) {
-            let curr = queue.shift();
-
-            if (!units.some(u => u.gridX === curr.c && u.gridY === curr.r)) {
-                let t = getTerrain(curr.c, curr.r);
-                if (!isWaterTerrain(t)) {
-                    return curr;
-                }
-            }
-
-            let neighbors = [
-                {c: curr.c, r: curr.r - 1},
-                {c: curr.c, r: curr.r + 1},
-                {c: curr.c - 1, r: curr.r},
-                {c: curr.c + 1, r: curr.r}
-            ];
-
-            for (let n of neighbors) {
-                if (n.c >= 0 && n.c < cols && n.r >= 0 && n.r < rows) {
-                    let key = `${n.c},${n.r}`;
-                    if (!visited.has(key)) {
-                        visited.add(key);
-                        queue.push(n);
-                    }
-                }
-            }
-        }
-        console.warn(`[WARN][map_setup] getAvailableLandPos fell back to baseSquares[0] for team '${team}'.`);
-        return baseSquares[0];
-    }
-
-    // Spawns 3 Tanks for the team
-    for (let i = 0; i < 3; i++) {
-        let pos = getAvailableLandPos();
-        units.push({ name: 'Tank', type: 'land', range: 3, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: tankImgRef, loaded: tankLoadRef });
-    }
-
-    // Spawns 5 Infantry units for the team
-    for (let i = 0; i < 5; i++) {
-        let pos = getAvailableLandPos();
-        units.push({ name: 'Infantry', type: 'land', range: 2, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: infImgRef, loaded: infLoadRef });
-    }
-
-    // Spawns 1 Artillery unit for the team
-    let artPos = getAvailableLandPos();
-    units.push({ name: 'Artillery', type: 'land', range: 2, gridX: artPos.c, gridY: artPos.r, x: artPos.c*cellSize, y: artPos.r*cellSize, img: artImgRef, loaded: artLoadRef });
-
-    console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with units.`);
+    console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with lone initial infantry.`);
 }
 
 // Triggers initial team spawning sequence for both factions
