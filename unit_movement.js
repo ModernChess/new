@@ -54,7 +54,6 @@ function getLargerCoord(c, r) {
     if (lc >= 9) lc = 8;
     if (lr >= 9) lr = 8;
 
-    SystemLog.info(`Translated grid (${c}, ${r}) to larger coord:`, { col: cols_9x9[lc], row: rows_9x9[lr] });
     return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
@@ -65,9 +64,8 @@ function getUnitCombatRange(unit) {
         return [];
     }
 
-    let maxDist = (unit.name === 'Ship') ? 1 : (unit.name === 'Artillery' ? 3 : 0);
+    let maxDist = ((unit.name || '').includes('Ship')) ? 1 : ((unit.name || '').includes('Artillery') ? 3 : 0);
     if (maxDist === 0) {
-        SystemLog.info(`Unit '${unit.name}' does not possess a ranged attack profile.`);
         return [];
     }
 
@@ -93,26 +91,19 @@ function getUnitCombatRange(unit) {
         }
     });
 
-    SystemLog.success(`Generated ${results.length} combat range tiles for unit '${unit.name}' at (${unit.gridX}, ${unit.gridY}).`);
     return results;
 }
 
 // Determines all legal movement path tiles available to a specific unit type
 function getLegalMoves(unit) {
-    if (!unit) {
-        SystemLog.error('getLegalMoves called with a null or undefined unit.');
-        return [];
-    }
+    if (!unit) return [];
 
     let moves = [];
     let maxRange = unit.range;
     let cx = unit.gridX;
     let cy = unit.gridY;
 
-    if (!validateCoordinates(cx, cy)) {
-        SystemLog.error(`Unit '${unit.name}' has invalid position coordinates: (${cx}, ${cy})`);
-        return [];
-    }
+    if (!validateCoordinates(cx, cy)) return [];
 
     let directions = [
         {dx: 0, dy: -1}, {dx: 0, dy: 1},  
@@ -146,7 +137,6 @@ function getLegalMoves(unit) {
         }
     });
 
-    SystemLog.success(`Calculated ${moves.length} legal move tiles for unit '${unit.name}' (${unit.type}).`);
     return moves;
 }
 
@@ -162,9 +152,7 @@ canvas.addEventListener('pointerdown', (e) => {
     let c = Math.floor(touchX / cellSize);
     let r = Math.floor(touchY / cellSize);
 
-    if (!validateCoordinates(c, r)) {
-        return;
-    }
+    if (!validateCoordinates(c, r)) return;
 
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
@@ -176,7 +164,6 @@ canvas.addEventListener('pointerdown', (e) => {
                 return; 
             }
 
-            SystemLog.info(`Initiating long-press selection timer for unit: ${clickedUnit.name} (${unitTeam})`);
             pressTimer = setTimeout(() => {
                 selectedUnit = clickedUnit;
                 legalMoves = getLegalMoves(clickedUnit);
@@ -185,7 +172,7 @@ canvas.addEventListener('pointerdown', (e) => {
                 SystemLog.success(`Successfully selected unit: ${selectedUnit.name} at grid (${c}, ${r})`);
             }, 500); 
         } else {
-            if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
+            if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
                 let btnX = selectedUnit.renderX + cellSize + 12;
                 let btnY = selectedUnit.renderY - 12;
                 let btnSize = cellSize * 0.85;
@@ -193,7 +180,6 @@ canvas.addEventListener('pointerdown', (e) => {
                 if (touchX >= btnX && touchX <= btnX + btnSize && touchY >= btnY && touchY <= btnY + btnSize) {
                     rangeMode = !rangeMode; 
                     rangeSquares = rangeMode ? getUnitCombatRange(selectedUnit) : [];
-                    SystemLog.info(`Toggled range mode for ${selectedUnit.name}: status = ${rangeMode}`);
                     return;
                 }
             }
@@ -202,43 +188,23 @@ canvas.addEventListener('pointerdown', (e) => {
                 let isLegal = legalMoves.some(m => m.c === c && m.r === r);
                 if (isLegal) {
                     if (targetTile && targetTile.c === c && targetTile.r === r) {
-                        SystemLog.info(`Executing movement command for ${selectedUnit.name} to target tile (${c}, ${r})`);
-                        
                         let success = tryMoveUnit(selectedUnit, c, r);
                         if (success) {
-                            SystemLog.success(`Unit ${selectedUnit.name} moved successfully.`);
                             selectedUnit = null;
                             legalMoves = [];
                             targetTile = null;
-                        } else {
-                            SystemLog.error(`Movement execution failed for ${selectedUnit.name} at destination (${c}, ${r}).`);
                         }
-
                     } else {
                         targetTile = { c: c, r: r };
-                        SystemLog.info(`Target destination preview set to tile: (${c}, ${r}). Click again to confirm.`);
                     }
-                } else {
-                    SystemLog.warn(`Illegal move attempted to tile: (${c}, ${r}) for unit ${selectedUnit.name}`);
                 }
             }
         }
     }
 });
 
-canvas.addEventListener('pointerup', () => { 
-    if (pressTimer) { 
-        clearTimeout(pressTimer); 
-        pressTimer = null; 
-    } 
-});
-canvas.addEventListener('pointercancel', () => { 
-    if (pressTimer) { 
-        clearTimeout(pressTimer); 
-        pressTimer = null; 
-        SystemLog.warn('Pointer interaction canceled; long-press selection aborted.');
-    } 
-});
+canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 
 // Main game rendering and update loop executed every animation frame
 function update() {
@@ -295,7 +261,7 @@ function update() {
             ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
         }
 
-        if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
+        if ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery')) {
             let btnX = selectedUnit.renderX + cellSize + 12;
             let btnY = selectedUnit.renderY - 12;
             let btnSize = cellSize * 0.85;
