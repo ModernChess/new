@@ -1,5 +1,5 @@
 // =========================================================================
-// TEAM MECHANICS, COMBAT, AND CAPTURE CONTROLLER
+// TEAM MECHANICS, SPECIALSUPERUNITS, COMBAT, AND WIN CONDITIONS CONTROLLER
 // =========================================================================
 
 let currentTurn = 'blue';
@@ -7,14 +7,16 @@ let blueCoins = 0;
 let redCoins = 0;
 let destroyedUnitsQueue = [];
 let flagAnimations = {};
+let gameOver = false;
+let winnerMessage = '';
 
 let goldCores = [
-    { id: 'gc1', c: 6, r: 4, owner: null, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}] },
-    { id: 'gc2', c: 1, r: 5, owner: null, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}] },
-    { id: 'gc3', c: 12, r: 7, owner: null, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}] },
-    { id: 'gc4', c: 5, r: 14, owner: null, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}] },
-    { id: 'gc5', c: 16, r: 12, owner: null, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}] },
-    { id: 'gc6', c: 11, r: 16, owner: null, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}] }
+    { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
+    { id: 'gc2', c: 1, r: 5, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, // Red Base Core
+    { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
+    { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
+    { id: 'gc5', c: 16, r: 12, owner: 'blue', isBase: true, teamBase: 'blue', captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] }, // Blue Base Core
+    { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] }
 ];
 
 const TeamLog = {
@@ -65,6 +67,42 @@ function areUnitsAdjacent(u1, u2) {
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
+function checkWinConditions(allUnits) {
+    if (gameOver) return;
+
+    let redLandUnits = allUnits.filter(u => getTeamFromUnit(u) === 'red' && !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
+    let blueLandUnits = allUnits.filter(u => getTeamFromUnit(u) === 'blue' && !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
+    let redTotal = allUnits.filter(u => getTeamFromUnit(u) === 'red');
+    let blueTotal = allUnits.filter(u => getTeamFromUnit(u) === 'blue');
+
+    if (redLandUnits.length === 0 || redTotal.length === 0) {
+        gameOver = true;
+        winnerMessage = 'BLUE TEAM WINS BY ANNIHILATION!';
+        TeamLog.success(winnerMessage);
+        return;
+    }
+    if (blueLandUnits.length === 0 || blueTotal.length === 0) {
+        gameOver = true;
+        winnerMessage = 'RED TEAM WINS BY ANNIHILATION!';
+        TeamLog.success(winnerMessage);
+        return;
+    }
+
+    goldCores.forEach(core => {
+        if (core.isBase && core.owner) {
+            let occupyingUnit = allUnits.find(u => u.gridX === core.c && u.gridY === core.r);
+            if (occupyingUnit) {
+                let unitTeam = getTeamFromUnit(occupyingUnit);
+                if (unitTeam !== core.teamBase) {
+                    gameOver = true;
+                    winnerMessage = `${unitTeam.toUpperCase()} TEAM WINS BY CAPTURING ENEMY BASE!`;
+                    TeamLog.success(winnerMessage);
+                }
+            }
+        }
+    });
+}
+
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
     let combatUnits = teamUnits.filter(u => !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
@@ -100,10 +138,30 @@ function getSuperunitsForTeam(teamName, allUnits) {
         }
 
         let totalPower = cluster.reduce((sum, u) => sum + getUnitPower(u), 0);
+        
+        // Incorporate Gold Cores owned by team that have units in their zone (Specialsuperunits)
+        goldCores.forEach(core => {
+            if (core.owner === teamName) {
+                let supportingUnitInZone = cluster.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY) || (u.gridX === core.c && u.gridY === core.r));
+                if (supportingUnitInZone) {
+                    superunits.push({
+                        units: cluster,
+                        power: totalPower,
+                        isSpecial: false,
+                        isSpecialSuperunit: true,
+                        core: core,
+                        team: teamName
+                    });
+                    return;
+                }
+            }
+        });
+
         superunits.push({
             units: cluster,
             power: totalPower,
             isSpecial: false,
+            isSpecialSuperunit: false,
             team: teamName
         });
     });
@@ -113,6 +171,7 @@ function getSuperunitsForTeam(teamName, allUnits) {
             units: [sp],
             power: getUnitPower(sp),
             isSpecial: true,
+            isSpecialSuperunit: false,
             team: teamName
         });
     });
@@ -160,13 +219,11 @@ function resolveUnitInteractions(allUnits) {
     let redSuList = getSuperunitsForTeam('red', allUnits);
     let unitsToDestroy = new Set();
 
-    // 1. MELEE RESOLUTION (Tanks, Infantry, and Ship-vs-Ship touch/melee destruction)
     blueSuList.forEach(bSu => {
         redSuList.forEach(rSu => {
             let touching = bSu.units.some(bu => rSu.units.some(ru => areUnitsAdjacent(bu, ru) || (bu.gridX === ru.gridX && bu.gridY === ru.gridY)));
             if (touching) {
                 if (bSu.power === Infinity && rSu.power === Infinity) {
-                    // Ship vs Ship touching: destroy both mutually
                     bSu.units.forEach(u => unitsToDestroy.add(u));
                     rSu.units.forEach(u => unitsToDestroy.add(u));
                 } else if (bSu.power > rSu.power) {
@@ -178,15 +235,15 @@ function resolveUnitInteractions(allUnits) {
         });
     });
 
-    // 2. RANGE RESOLUTION (Ship Range Strike - skips other ships)
     allUnits.forEach(ship => {
         let shipName = (ship.name || '').toLowerCase();
         if (shipName.includes('ship')) {
             let combatRanges = getUnitCombatRange(ship);
+            allUnits.coreRangeHitCheck = true;
             allUnits.forEach(targetUnit => {
                 if (getTeamFromUnit(targetUnit) !== getTeamFromUnit(ship)) {
                     let targetName = (targetUnit.name || '').toLowerCase();
-                    if (targetName.includes('ship')) return; // Ships do NOT destroy ships at range
+                    if (targetName.includes('ship')) return;
 
                     let inRange = combatRanges.some(rangeBox => 
                         targetUnit.gridX >= rangeBox.startC && targetUnit.gridX <= rangeBox.endC &&
@@ -203,31 +260,52 @@ function resolveUnitInteractions(allUnits) {
     if (unitsToDestroy.size > 0) {
         commitUnitDestruction(allUnits, unitsToDestroy);
     }
+
+    checkWinConditions(allUnits);
 }
 
 function tryMoveUnit(unit, newC, newR) {
-    if (!unit) return false;
+    if (gameOver || !unit) return false;
     if (isUnitLockedInStalemate(unit, units)) {
         return false;
     }
 
-    unit.gridX = newC;
-    unit.gridY = newR;
+    let movingTeam = getTeamFromUnit(unit);
+    let movingPower = getUnitPower(unit);
 
     goldCores.forEach(core => {
-        let isAdjacentToCore = Math.abs(core.c - newC) <= 1 && Math.abs(core.r - newR) <= 1;
+        let inZone = core.captureZones.some(z => z.c === newC && z.r === newR) || (core.c === newC && core.r === newR);
 
-        if (isAdjacentToCore) {
-            let currentTeam = getTeamFromUnit(unit);
-            
-            if (core.owner !== currentTeam) {
-                core.owner = currentTeam;
-                if (currentTeam === 'blue') blueCoins++;
+        if (inZone) {
+            let defendingTeam = core.owner;
+            if (defendingTeam && defendingTeam !== movingTeam) {
+                let defenderSu = getSuperunitsForTeam(defendingTeam, units).find(su => su.core === core || su.units.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY)));
+                let defenderPower = defenderSu ? defenderSu.power : 0;
+
+                if (movingPower > defenderPower) {
+                    core.owner = movingTeam;
+                    if (movingTeam === 'blue') blueCoins++;
+                    else redCoins++;
+                    flagAnimations[core.id] = performance.now();
+                } else {
+                    let directlyConnectedToDefenderUnits = units.some(defU => getTeamFromUnit(defU) === defendingTeam && areUnitsAdjacent(unit, defU));
+                    if (directlyConnectedToDefenderUnits) {
+                        unitsToDestroy.add(unit); // Only destroyed if directly connected to core defending units
+                    }
+                }
+            } else if (!defendingTeam) {
+                core.owner = movingTeam;
+                if (movingTeam === 'blue') blueCoins++;
                 else redCoins++;
+                flagAnimations[core.id] = performance.now();
+            } else {
                 flagAnimations[core.id] = performance.now();
             }
         }
     });
+
+    unit.gridX = newC;
+    unit.gridY = newR;
 
     resolveUnitInteractions(units);
     currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
@@ -252,6 +330,17 @@ function drawTeamUIAndFlags() {
     ctx.fillText(`Blue Coins: ${blueCoins}`, 24, 38);
     ctx.fillStyle = '#e74c3c';
     ctx.fillText(`Red Coins: ${redCoins}`, 24, 54);
+
+    if (gameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(winnerMessage, canvas.width / 2, canvas.height / 2);
+        return;
+    }
 
     goldCores.forEach(core => {
         let cx = core.c * cellSize + cellSize / 2;
@@ -295,11 +384,15 @@ function drawTeamUIAndFlags() {
     ['blue', 'red'].forEach(teamName => {
         let suList = getSuperunitsForTeam(teamName, units);
         suList.forEach(su => {
-            // RESTRICTION: Only show power labels for actual multi-unit clusters or infinite power units (Ships). Skip single non-infinite units.
-            if (su.units.length <= 1 && su.power !== Infinity) return;
+            if (su.units.length <= 1 && su.power !== Infinity && !su.isSpecialSuperunit) return;
 
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
+
+            if (su.isSpecialSuperunit && su.core) {
+                avgX = (avgX + su.core.c * cellSize) / 2;
+                avgY = (avgY + su.core.r * cellSize) / 2;
+            }
 
             let unitCenterX = avgX + cellSize / 2;
             let unitCenterY = avgY + cellSize / 2;
