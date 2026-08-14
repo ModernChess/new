@@ -10,12 +10,13 @@ let flagAnimations = {};
 let gameOver = false;
 let winnerMessage = '';
 
+// ALL gold cores are fully functional resource points and strategic zones
 let goldCores = [
     { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
-    { id: 'gc2', c: 11, r: 0, owner: 'red', isBase: true, teamBase: 'red', isTrueBaseCore: true, captureZones: [{c:11, r:0}, {c:11, r:1}, {c:10, r:0}, {c:12, r:0}, {c:10, r:1}, {c:12, r:1}, {c:10, r:2}, {c:12, r:2}, {c:11, r:2}] }, // Red True Base Core (L1 -> c:11, r:0)
+    { id: 'gc2', c: 1, r: 5, owner: 'red', isBase: false, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, 
     { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
     { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
-    { id: 'gc5', c: 0, r: 11, owner: 'blue', isBase: true, teamBase: 'blue', isTrueBaseCore: true, captureZones: [{c:0, r:11}, {c:0, r:10}, {c:0, r:12}, {c:1, r:10}, {c:1, r:11}, {c:1, r:12}, {c:1, r:13}, {c:0, r:13}] }, // Blue True Base Core (A12 -> c:0, r:11)
+    { id: 'gc5', c: 16, r: 12, owner: 'blue', isBase: false, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] },
     { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] }
 ];
 
@@ -88,18 +89,20 @@ function checkWinConditions(allUnits) {
         return;
     }
 
-    // STRICT CHECK: Only true faction base cores (`isTrueBaseCore`) trigger win conditions!
-    goldCores.forEach(core => {
-        if (core.isBase && core.isTrueBaseCore) {
-            let occupyingUnit = allUnits.find(u => u.gridX === core.c && u.gridY === core.r);
-            if (occupyingUnit) {
-                let unitTeam = getTeamFromUnit(occupyingUnit);
-                if (unitTeam !== core.teamBase) {
-                    gameOver = true;
-                    winnerMessage = `${unitTeam.toUpperCase()} TEAM WINS BY CAPTURING ENEMY BASE!`;
-                    TeamLog.success(winnerMessage);
-                }
-            }
+    // Base capture check maps strictly to the base core coordinates from map_setup (Blue base core: A12 -> c:0, r:11; Red base core: L1 -> c:11, r:0)
+    allUnits.forEach(u => {
+        let team = getTeamFromUnit(u);
+        // If Red unit steps on Blue base core (c:0, r:11)
+        if (team === 'red' && u.gridX === 0 && u.gridY === 11) {
+            gameOver = true;
+            winnerMessage = 'RED TEAM WINS BY CAPTURING ENEMY BASE!';
+            TeamLog.success(winnerMessage);
+        }
+        // If Blue unit steps on Red base core (c:11, r:0)
+        if (team === 'blue' && u.gridX === 11 && u.gridY === 0) {
+            gameOver = true;
+            winnerMessage = 'BLUE TEAM WINS BY CAPTURING ENEMY BASE!';
+            TeamLog.success(winnerMessage);
         }
     });
 }
