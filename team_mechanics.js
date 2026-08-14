@@ -144,7 +144,6 @@ function commitUnitDestruction(unitsArray, unitsToDestroy) {
         let index = unitsArray.indexOf(u);
         if (index !== -1) {
             unitsArray.splice(index, 1);
-            TeamLog.success(`Unit immediately destroyed and removed from board: ${u.name}`);
         }
         if (!destroyedUnitsQueue.some(item => item.unit === u)) {
             destroyedUnitsQueue.push({
@@ -161,7 +160,6 @@ function resolveUnitInteractions(allUnits) {
     let redSuList = getSuperunitsForTeam('red', allUnits);
     let unitsToDestroy = new Set();
 
-    // 1. Superunit & Single Unit Power Combat Resolution
     blueSuList.forEach(bSu => {
         redSuList.forEach(rSu => {
             let touching = bSu.units.some(bu => rSu.units.some(ru => areUnitsAdjacent(bu, ru) || (bu.gridX === ru.gridX && bu.gridY === ru.gridY)));
@@ -175,7 +173,6 @@ function resolveUnitInteractions(allUnits) {
         });
     });
 
-    // 2. Passive automatic infinite ship range strike rule
     allUnits.forEach(ship => {
         let shipTeam = getTeamFromUnit(ship);
         let shipName = (ship.name || '').toLowerCase();
@@ -190,7 +187,6 @@ function resolveUnitInteractions(allUnits) {
                     );
                     if (inRange) {
                         unitsToDestroy.add(targetUnit);
-                        TeamLog.success(`Infinite Ship Range Strike! Target unit ${targetUnit.name} vaporized within ship range zone.`);
                     }
                 }
             });
@@ -205,13 +201,11 @@ function resolveUnitInteractions(allUnits) {
 function tryMoveUnit(unit, newC, newR) {
     if (!unit) return false;
     if (isUnitLockedInStalemate(unit, units)) {
-        TeamLog.warn(`Movement blocked: Unit ${unit.name} is locked in an equal-power stalemate.`);
         return false;
     }
 
     unit.gridX = newC;
     unit.gridY = newR;
-    TeamLog.info(`Unit ${unit.name} moved to new position: (${newC}, ${newR})`);
 
     goldCores.forEach(core => {
         let inZone = core.captureZones.some(z => z.c === newC && z.r === newR);
@@ -221,9 +215,6 @@ function tryMoveUnit(unit, newC, newR) {
                 core.owner = currentTeam;
                 if (currentTeam === 'blue') blueCoins++;
                 else redCoins++;
-                TeamLog.success(`Gold Core '${core.id}' captured by ${currentTeam} team!`);
-            } else {
-                TeamLog.info(`Gold Core '${core.id}' re-stepped by owner ${currentTeam}.`);
             }
             flagAnimations[core.id] = performance.now();
         }
@@ -231,7 +222,6 @@ function tryMoveUnit(unit, newC, newR) {
 
     resolveUnitInteractions(units);
     currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
-    TeamLog.info(`Turn switched. Current active turn: ${currentTurn}`);
     return true;
 }
 
@@ -290,45 +280,29 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    let mapCenterX = canvas.width / 2;
-    let mapCenterY = canvas.height / 2;
-
     ['blue', 'red'].forEach(teamName => {
         let suList = getSuperunitsForTeam(teamName, units);
         suList.forEach(su => {
-            if (su.units.length <= 1 && su.power !== Infinity) return; // Restrict badges to clusters or infinite units
-
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
-            let dirX = mapCenterX - (avgX + cellSize / 2);
-            let dirY = mapCenterY - (avgY + cellSize / 2);
-            let length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
-            let significantDistance = cellSize * 1.8;
-            let offsetX = (dirX / length) * significantDistance;
-            let offsetY = (dirY / length) * significantDistance;
-
-            let badgeX = avgX + cellSize / 2 + offsetX - 22;
-            let badgeY = avgY + cellSize / 2 + offsetY - 12;
+            let badgeX = avgX + cellSize / 2 - 22;
+            let badgeY = avgY + cellSize / 2 - 12;
 
             ctx.fillStyle = '#cc0000';
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2.5;
             let powerDisplay = su.power === Infinity ? '∞' : su.power;
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(badgeX, badgeY, 44, 24, 6);
-                ctx.fill();
-                ctx.stroke();
-            } else {
-                ctx.fillRect(badgeX, badgeY, 44, 24);
-                ctx.strokeRect(badgeX, badgeY, 44, 24);
-            }
+            
+            ctx.beginPath();
+            ctx.fillRect(badgeX, badgeY, 44, 24);
+            ctx.strokeRect(badgeX, badgeY, 44, 24);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 13px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            
             let lockedText = su.units.some(u => isUnitLockedInStalemate(u, units)) ? ' 🔒' : '';
             ctx.fillText(`${powerDisplay}${lockedText}`, badgeX + 22, badgeY + 12);
         });
@@ -348,5 +322,3 @@ function drawTeamUIAndFlags() {
         return true;
     });
 }
-
-TeamLog.info('Team mechanics controller updated successfully.');
