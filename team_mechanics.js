@@ -12,10 +12,10 @@ let winnerMessage = '';
 
 let goldCores = [
     { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
-    { id: 'gc2', c: 1, r: 5, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, // Red Base Core
+    { id: 'gc2', c: 11, r: 0, owner: 'red', isBase: true, teamBase: 'red', isTrueBaseCore: true, captureZones: [{c:11, r:0}, {c:11, r:1}, {c:10, r:0}, {c:12, r:0}, {c:10, r:1}, {c:12, r:1}, {c:10, r:2}, {c:12, r:2}, {c:11, r:2}] }, // Red True Base Core (L1 -> c:11, r:0)
     { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
     { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
-    { id: 'gc5', c: 16, r: 12, owner: 'blue', isBase: true, teamBase: 'blue', captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] }, // Blue Base Core
+    { id: 'gc5', c: 0, r: 11, owner: 'blue', isBase: true, teamBase: 'blue', isTrueBaseCore: true, captureZones: [{c:0, r:11}, {c:0, r:10}, {c:0, r:12}, {c:1, r:10}, {c:1, r:11}, {c:1, r:12}, {c:1, r:13}, {c:0, r:13}] }, // Blue True Base Core (A12 -> c:0, r:11)
     { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] }
 ];
 
@@ -88,8 +88,9 @@ function checkWinConditions(allUnits) {
         return;
     }
 
+    // STRICT CHECK: Only true faction base cores (`isTrueBaseCore`) trigger win conditions!
     goldCores.forEach(core => {
-        if (core.isBase && core.owner) {
+        if (core.isBase && core.isTrueBaseCore) {
             let occupyingUnit = allUnits.find(u => u.gridX === core.c && u.gridY === core.r);
             if (occupyingUnit) {
                 let unitTeam = getTeamFromUnit(occupyingUnit);
@@ -139,7 +140,6 @@ function getSuperunitsForTeam(teamName, allUnits) {
 
         let totalPower = cluster.reduce((sum, u) => sum + getUnitPower(u), 0);
         
-        // Incorporate Gold Cores owned by team that have units in their zone (Specialsuperunits)
         goldCores.forEach(core => {
             if (core.owner === teamName) {
                 let supportingUnitInZone = cluster.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY) || (u.gridX === core.c && u.gridY === core.r));
@@ -279,7 +279,6 @@ function tryMoveUnit(unit, newC, newR) {
         if (inZone) {
             let defendingTeam = core.owner;
             
-            // Only trigger capture logic if the core is neutral or owned by the enemy
             if (defendingTeam !== movingTeam) {
                 if (defendingTeam && defendingTeam !== movingTeam) {
                     let defenderSu = getSuperunitsForTeam(defendingTeam, units).find(su => su.core === core || su.units.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY)));
