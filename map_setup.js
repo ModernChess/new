@@ -4,15 +4,21 @@
 
 // References the main canvas element from the HTML document DOM
 const canvas = document.getElementById('gameCanvas');
+if (!canvas) {
+    console.error("[ERROR][map_setup] Canvas element with ID 'gameCanvas' not found in DOM.");
+}
 // Acquires the 2D rendering context interface for drawing graphics on the canvas
-const ctx = canvas.getContext('2d');
+const ctx = canvas ? canvas.getContext('2d') : null;
+if (!ctx) {
+    console.error("[ERROR][map_setup] Failed to acquire 2D rendering context from canvas.");
+}
 
 // Defines the total number of grid columns on the game board map
 const cols = 18;
 // Defines the total number of grid rows on the game board map
 const rows = 18;
 // Calculates individual cell pixel dimensions relative to total canvas width
-const cellSize = canvas.width / cols;
+const cellSize = canvas ? canvas.width / cols : 0;
 
 // Linear interpolation mathematical utility function for smooth movement/transitions
 function lerp(start, end, t) {
@@ -86,11 +92,14 @@ let redShipImg = new Image(), redShipLoaded = false;
 function updateLoadingProgress() {
     loadedCount++;
     let percent = Math.floor((loadedCount / totalAssets) * 100);
-    progressBar.style.width = percent + '%';
-    progressText.innerText = percent + '%';
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.innerText = percent + '%';
+
+    console.log(`[INFO][map_setup] Asset loaded progress: ${loadedCount}/${totalAssets} (${percent}%)`);
 
     // Fades out and removes loading overlay once all assets have successfully loaded
     if (loadedCount >= totalAssets) {
+        console.log("[SUCCESS][map_setup] All game assets loaded successfully.");
         setTimeout(() => {
             loadingOverlay.style.opacity = '0';
             loadingOverlay.style.transition = 'opacity 0.4s ease';
@@ -103,7 +112,7 @@ function updateLoadingProgress() {
 function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
     fetch(url)
         .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.blob();
         })
         .then(blob => {
@@ -115,12 +124,14 @@ function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
             };
         })
         .catch(err => {
+            console.warn(`[WARN][map_setup] Fetch blob failed for ${url}, falling back to direct URL assignment. Error:`, err);
             imgObj.src = url;
             imgObj.onload = () => {
                 setLoadedFlag(true);
                 updateLoadingProgress();
             };
-            imgObj.onerror = () => {
+            imgObj.onerror = (loadErr) => {
+                console.error(`[ERROR][map_setup] Completely failed to load asset at URL: ${url}`, loadErr);
                 updateLoadingProgress();
             };
         });
@@ -161,8 +172,8 @@ function getTerrain(c, r) {
     if (coord === 'L1') return 'red_core';
     if (coord === 'K1' || coord === 'M1' || coord === 'K2' || coord === 'L2' || coord === 'M2') return 'red_base';
 
-    const goldCores = ['G5', 'B6', 'M8', 'F15', 'Q13', 'L17'];
-    if (goldCores.includes(coord)) return 'gold_core';
+    const goldCoresList = ['G5', 'B6', 'M8', 'F15', 'Q13', 'L17'];
+    if (goldCoresList.includes(coord)) return 'gold_core';
 
     const goldList = [
         'F4', 'G4', 'H4', 'A5', 'B5', 'C5', 'F5', 'H5', 'A6', 'C6', 'F6', 'G6', 'H6', 
@@ -205,6 +216,7 @@ function getPortSquare(team) {
             if (team === 'red' && t === 'red_navy') return {c, r};
         }
     }
+    console.warn(`[WARN][map_setup] Port square not found for team '${team}'. Defaulting to (0,0).`);
     return {c:0, r:0};
 }
 
@@ -264,6 +276,7 @@ function spawnTeam(team) {
                 }
             }
         }
+        console.warn(`[WARN][map_setup] getAvailableLandPos fell back to baseSquares[0] for team '${team}'.`);
         return baseSquares[0];
     }
 
@@ -282,8 +295,12 @@ function spawnTeam(team) {
     // Spawns 1 Artillery unit for the team
     let artPos = getAvailableLandPos();
     units.push({ name: 'Artillery', type: 'land', range: 2, gridX: artPos.c, gridY: artPos.r, x: artPos.c*cellSize, y: artPos.r*cellSize, img: artImgRef, loaded: artLoadRef });
+
+    console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with units.`);
 }
 
 // Triggers initial team spawning sequence for both factions
 spawnTeam('blue');
 spawnTeam('red');
+
+console.log("[SUCCESS][map_setup] Map setup script loaded and execution initialized.");
