@@ -1,10 +1,32 @@
+// =========================================================================
+// TEAM MECHANICS, COMBAT, CAPTURE, AND UI OVERLAY CONTROLLER
+// =========================================================================
+
 // --- TEAM & TURN STATE ---
 let currentTurn = 'blue'; // Tracks whose turn it currently is ('blue' or 'red')
-let blueCoins = 0;        // Keeps score of gold cores captured by the blue team
-let redCoins = 0;         // Keeps score of gold cores captured by the red team
+let blueCoins = 0;         // Keeps score of gold cores captured by the blue team
+let redCoins = 0;          // Keeps score of gold cores captured by the red team
 
-let flagAnimations = {};  // Stores active drop animation data for captured flags
+let flagAnimations = {};   // Stores active drop animation data for captured flags
 let destroyedUnitsQueue = []; // Holds units currently playing the disintegration animation before removal
+
+// =========================================================================
+// CONSOLE LOGGING & ERROR VALIDATION SYSTEM
+// =========================================================================
+const TeamSystemLog = {
+    info: function(message, data = null) {
+        console.log(`%c[INFO][team_mechanics]: ${message}`, 'color: #3498db; font-weight: bold;', data !== null ? data : '');
+    },
+    warn: function(message, data = null) {
+        console.warn(`%c[WARN][team_mechanics]: ${message}`, 'color: #f1c40f; font-weight: bold;', data !== null ? data : '');
+    },
+    error: function(message, errorDetails = null) {
+        console.error(`%c[ERROR][team_mechanics]: ${message}`, 'color: #e74c3c; font-weight: bold;', errorDetails !== null ? errorDetails : '');
+    },
+    success: function(message, data = null) {
+        console.log(`%c[SUCCESS][team_mechanics]: ${message}`, 'color: #2ecc71; font-weight: bold;', data !== null ? data : '');
+    }
+};
 
 // Precise Gold Cores and strict Excel-mapped capture zones
 let goldCores = [
@@ -38,16 +60,31 @@ let goldCores = [
 let blueFlagImg = new Image(); // Creates image object for blue team's flag
 blueFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/blue_flag.jpg'; // Sets source URL for blue flag asset
 let blueFlagLoaded = false; // Flag status tracking to ensure image is fully downloaded before drawing
-blueFlagImg.onload = () => { blueFlagLoaded = true; }; // Sets ready status once image downloads
+blueFlagImg.onload = () => { 
+    blueFlagLoaded = true; 
+    TeamSystemLog.success('Blue flag asset loaded successfully.');
+}; 
+blueFlagImg.onerror = () => {
+    TeamSystemLog.error('Failed to load blue flag asset from CDN source.');
+};
 
 let redFlagImg = new Image(); // Creates image object for red team's flag
 redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red_flag.jpg'; // Sets source URL for red flag asset
 let redFlagLoaded = false; // Flag status tracking for red flag asset
-redFlagImg.onload = () => { redFlagLoaded = true; }; // Sets ready status once image downloads
+redFlagImg.onload = () => { 
+    redFlagLoaded = true; 
+    TeamSystemLog.success('Red flag asset loaded successfully.');
+}; 
+redFlagImg.onerror = () => {
+    TeamSystemLog.error('Failed to load red flag asset from CDN source.');
+};
 
 // Determines which team ('blue' or 'red') a given unit belongs to based on properties or board position
 function getTeamFromUnit(unit) {
-    if (!unit) return 'blue'; // Fallback default if unit is null/undefined
+    if (!unit) {
+        TeamSystemLog.warn('getTeamFromUnit called with null/undefined unit. Defaulting to \'blue\'.');
+        return 'blue'; // Fallback default if unit is null/undefined
+    }
     if (unit._assignedTeam) return unit._assignedTeam; // Returns cached team if already evaluated
     
     if (unit.team) {
@@ -66,12 +103,16 @@ function getTeamFromUnit(unit) {
     }
     
     unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue'; // Spatial fallback: top half grid rows are red, bottom half are blue
+    TeamSystemLog.info(`Team inferred via spatial fallback for unit '${unit.name || 'Unknown'}': ${unit._assignedTeam}`);
     return unit._assignedTeam;
 }
 
 // Calculates the strategic combat power value of a specific unit type
 function getUnitPower(unit) {
-    if (!unit) return 0; // Null check returns 0 power
+    if (!unit) {
+        TeamSystemLog.warn('getUnitPower called with null/undefined unit. Returning power 0.');
+        return 0; // Null check returns 0 power
+    }
     let name = (unit.name || '').toLowerCase();
     if (name.includes('artillery') || name.includes('ship') || name.includes('boat')) return 0; // Special units contribute 0 frontline power weight
     if (unit.power !== undefined && name.includes('artillery') === false && name.includes('ship') === false) return unit.power; // Uses custom assigned unit power if present
@@ -89,6 +130,7 @@ function isSpecialUnit(unit) {
 
 // Checks if two units are immediately adjacent to each other horizontally, vertically, or diagonally (Chebyshev distance <= 1)
 function areUnitsConnected(u1, u2) {
+    if (!u1 || !u2) return false;
     let dx = Math.abs(u1.gridX - u2.gridX); // Horizontal coordinate distance difference
     let dy = Math.abs(u1.gridY - u2.gridY); // Vertical coordinate distance difference
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0); // True if touching within 1 tile and not the exact same tile
@@ -96,6 +138,11 @@ function areUnitsConnected(u1, u2) {
 
 // Groups team units into connected "superunits", accounting for direct bonds and proxy enemy-bridge connections
 function getSuperunitsForTeam(teamName, allUnits) {
+    if (!Array.isArray(allUnits)) {
+        TeamSystemLog.error('getSuperunitsForTeam received invalid units array.');
+        return [];
+    }
+
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u)); // Filters regular combat units for the team
     let enemyUnits = allUnits.filter(u => getTeamFromUnit(u) !== teamName && !isSpecialUnit(u)); // Filters enemy combat units for proxy checks
     let visited = new Set(); // Tracks processed units to prevent infinite loops during traversal
@@ -147,6 +194,7 @@ function getSuperunitsForTeam(teamName, allUnits) {
 
 // Checks if a specific unit is currently locked in an equal-power frontline stalemate with an enemy superunit
 function isUnitLockedInStalemate(unit) {
+    if (!unit) return false;
     let team = getTeamFromUnit(unit);
     let opposingTeam = team === 'blue' ? 'red' : 'blue';
     let teamSupers = getSuperunitsForTeam(team, units);
@@ -168,6 +216,7 @@ function isUnitLockedInStalemate(unit) {
 
 // Queues a list of defeated units into the disintegration animation pipeline
 function queueForDisintegration(unitList) {
+    if (!Array.isArray(unitList) || unitList.length === 0) return;
     let now = performance.now();
     unitList.forEach(u => {
         if (!destroyedUnitsQueue.some(item => item.unit === u)) {
@@ -176,6 +225,7 @@ function queueForDisintegration(unitList) {
                 startTime: now,
                 duration: 1800 // Animation duration in milliseconds before complete removal
             });
+            TeamSystemLog.info(`Unit '${u.name}' queued for disintegration sequence.`);
         }
     });
 }
@@ -207,6 +257,7 @@ function resolveUnitInteractions() {
     if (fullyDestroyed.length > 0) {
         units = units.filter(u => !fullyDestroyed.includes(u)); // Removes destroyed units from active unit array
         destroyedUnitsQueue = destroyedUnitsQueue.filter(item => (now - item.startTime) < item.duration);
+        TeamSystemLog.success(`Cleaned up ${fullyDestroyed.length} fully disintegrated units from the board.`);
     }
 }
 
@@ -217,6 +268,7 @@ function isGoldCoreCenter(c, r) {
 
 // Checks and processes gold core capture events when a unit steps into a valid capture zone
 function checkAndCaptureGold(unit, c, r) {
+    if (!unit) return;
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
         let dx = Math.abs(core.c - c);
@@ -232,8 +284,10 @@ function checkAndCaptureGold(unit, c, r) {
 
             if (team === 'blue') {
                 blueCoins += 1; // Increments blue team coin score
+                TeamSystemLog.success(`Blue team captured Gold Core '${core.id}'! Current Blue Coins: ${blueCoins}`);
             } else {
                 redCoins += 1; // Increments red team coin score
+                TeamSystemLog.success(`Red team captured Gold Core '${core.id}'! Current Red Coins: ${redCoins}`);
             }
         }
     });
@@ -241,13 +295,25 @@ function checkAndCaptureGold(unit, c, r) {
 
 // Validates and processes a unit movement attempt, enforcing turn orders, stalemate locks, and capture checks
 function tryMoveUnit(unit, newC, newR) {
+    if (!unit) {
+        TeamSystemLog.error('tryMoveUnit called with null/undefined unit.');
+        return false;
+    }
+
     let unitTeam = getTeamFromUnit(unit);
-    if (unitTeam !== currentTurn) return false; // Blocks movement if it is not that team's active turn
-    if (isGoldCoreCenter(newC, newR)) return false; // Prohibits moving units directly onto gold core centers
+    if (unitTeam !== currentTurn) {
+        TeamSystemLog.warn(`Move rejected: Unit belongs to ${unitTeam}, but it is currently ${currentTurn}'s turn.`);
+        return false; // Blocks movement if it is not that team's active turn
+    }
+    
+    if (isGoldCoreCenter(newC, newR)) {
+        TeamSystemLog.warn(`Move rejected: Attempted to move unit onto Gold Core center tile (${newC}, ${newR}).`);
+        return false; // Prohibits moving units directly onto gold core centers
+    }
 
     // Prohibits movement if the unit is currently locked in an equal power stalemate
     if (isUnitLockedInStalemate(unit)) {
-        console.log(`🔒 STALEMATE LOCK: Unit cannot be moved while locked in equal power stalemate!`);
+        TeamSystemLog.warn(`🔒 STALEMATE LOCK: Unit '${unit.name}' cannot be moved while locked in equal power stalemate!`);
         return false;
     }
 
@@ -258,6 +324,7 @@ function tryMoveUnit(unit, newC, newR) {
     resolveUnitInteractions(); // Resolves combat interactions after movement
 
     currentTurn = (currentTurn === 'blue') ? 'red' : 'blue'; // Switches active turn to opposing team
+    TeamSystemLog.info(`Turn successfully passed. Current turn is now: ${currentTurn}`);
     return true;
 }
 
@@ -416,3 +483,5 @@ function drawTeamUIAndFlags() {
     ctx.fillText(`Red Coins: ${redCoins}`, 120, 48); // Displays red team captured gold score
     ctx.restore();
 }
+
+TeamSystemLog.info('Team mechanics and combat controller initialized successfully.');
