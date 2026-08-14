@@ -1,220 +1,257 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Chess - Menu</title>
-    <style>
-        :root {
-            --bg-color: #111;
-            --panel-bg: #1a1a1a;
-            --border-color: #333;
-            --accent-green: #2ecc71;
-            --accent-blue: #3498db;
-            --text-main: #ffffff;
-            --text-muted: #aaaaaa;
+<!DOCTYPE html> <!-- Declares the document type and version as HTML5 -->
+<html lang="en"> <!-- Root element of the HTML document specifying English language -->
+<head> <!-- Container for metadata, title, and stylesheet definitions -->
+    <meta charset="UTF-8"> <!-- Sets the character encoding standard to UTF-8 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Ensures responsive scaling on mobile devices -->
+    <title>Modern Chess</title> <!-- Sets the title text displayed on the browser tab -->
+    <style> <!-- Embedded CSS styling rules for the entire page interface -->
+        :root { /* Defines global CSS variable tokens for color themes */
+            --bg-color: #111; /* Dark background fill color for the page */
+            --panel-bg: #1a1a1a; /* Dark gray background fill color for panels/screens */
+            --border-color: #333; /* Standard border line outline color */
+            --accent-green: #2ecc71; /* Green accent color for success states and confirmation buttons */
+            --accent-blue: #3498db; /* Blue accent color for highlights and active turns */
+            --text-main: #ffffff; /* Primary white text color */
+            --text-muted: #aaaaaa; /* Muted gray secondary text color */
         }
 
-        body {
-            margin: 0;
-            background: var(--bg-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            font-family: sans-serif;
-            touch-action: manipulation;
-            color: var(--text-main);
+        body { /* Global styling rules for the main document body */
+            margin: 0; /* Removes default browser body padding/margins */
+            background: var(--bg-color); /* Sets background color using CSS variable */
+            display: flex; /* Uses flexbox layout model */
+            justify-content: center; /* Centers child elements horizontally */
+            align-items: center; /* Centers child elements vertically */
+            height: 100vh; /* Forces body height to fill full viewport height */
+            overflow: hidden; /* Hides scrollbars on the main window container */
+            font-family: sans-serif; /* Sets standard sans-serif font family */
+            touch-action: manipulation; /* Optimizes touch and tap responsiveness on mobile devices */
+            color: var(--text-main); /* Sets global text color */
         }
 
-        .screen {
-            display: none;
-            width: 100vw;
-            height: 100vh;
-            max-width: 540px;
-            max-height: 95vh;
-            background: var(--panel-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            flex-direction: column;
-            box-sizing: border-box;
-            position: relative;
-            overflow: hidden;
+        .screen { /* Generic styling layout class for app menu and game screens */
+            display: none; /* Hides all screens by default */
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            max-width: 540px; /* Restricts maximum width for mobile view layout */
+            max-height: 95vh; /* Restricts maximum height */
+            background: var(--panel-bg); /* Sets screen panel background color */
+            border: 2px solid var(--border-color); /* Adds screen outer border outline */
+            border-radius: 12px; /* Rounds screen container corners */
+            flex-direction: column; /* Stacks children vertically in a column */
+            box-sizing: border-box; /* Includes padding and borders in element width calculations */
+            position: relative; /* Establishes positioning context for child elements */
+            overflow: hidden; /* Clips overflowing content inside screen boundary */
         }
 
-        .screen.active {
-            display: flex;
+        .screen.active { /* Modifier class to make a specific screen visible */
+            display: flex; /* Displays screen elements using flex layout */
         }
 
-        .screen-header {
-            display: flex;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-            background: #222;
+        .screen-header { /* Header container layout at the top of menu screens */
+            display: flex; /* Uses flexbox layout */
+            align-items: center; /* Vertically aligns header content items */
+            padding: 16px; /* Adds inner padding around header items */
+            border-bottom: 1px solid var(--border-color); /* Adds bottom border divider line */
+            background: #222; /* Slightly lighter background fill for header */
         }
 
-        .back-btn {
-            background: #444;
-            color: white;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .back-btn { /* Style for screen navigation return / back buttons */
+            background: #444; /* Dark gray button background */
+            color: white; /* White text color */
+            border: none; /* Removes default button borders */
+            padding: 8px 14px; /* Inner button padding */
+            border-radius: 6px; /* Rounds button corners */
+            cursor: pointer; /* Changes cursor icon to pointer on hover */
+            font-size: 14px; /* Sets font size */
+            font-weight: bold; /* Makes button text bold */
         }
 
-        .screen-title {
-            margin: 0;
-            flex-grow: 1;
-            text-align: center;
-            font-size: 18px;
-            padding-right: 40px;
+        .screen-title { /* Style for centered titles inside screen headers */
+            margin: 0; /* Removes default margins */
+            flex-grow: 1; /* Allows title to occupy remaining horizontal space */
+            text-align: center; /* Centers title text */
+            font-size: 18px; /* Sets header font size */
+            padding-right: 40px; /* Offsets padding to visually balance back button width */
         }
 
-        .version-badge {
-            background: #222;
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: bold;
-            align-self: center;
-            margin-top: auto;
-            margin-bottom: 8px;
+        .version-badge { /* Style for version display tag at bottom of menus */
+            background: #222; /* Dark background fill */
+            border: 1px solid var(--border-color); /* Subtle border outline */
+            color: var(--text-muted); /* Muted gray text color */
+            padding: 6px 12px; /* Inner padding */
+            border-radius: 16px; /* Rounded pill shape */
+            font-size: 12px; /* Small font size */
+            font-weight: bold; /* Bold text weight */
+            align-self: center; /* Centers badge horizontally */
+            margin-top: auto; /* Pushes element toward bottom of flex container */
+            margin-bottom: 8px; /* Bottom margin spacing */
         }
 
-        .screen-body {
-            padding: 20px;
-            overflow-y: auto;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+        .screen-body { /* Scrollable body content container inside menu screens */
+            padding: 20px; /* Inner content padding */
+            overflow-y: auto; /* Enables vertical scrolling if content exceeds height */
+            flex-grow: 1; /* Fills available vertical space */
+            display: flex; /* Flexbox container */
+            flex-direction: column; /* Stacks children vertically */
+            gap: 12px; /* Spacing gap between child elements */
         }
 
-        .menu-btn {
-            background: #262626;
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            padding: 16px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: left;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .menu-btn { /* Style for menu option navigation buttons */
+            background: #262626; /* Dark gray button fill color */
+            color: var(--text-main); /* White text color */
+            border: 1px solid var(--border-color); /* Subtle border outline */
+            padding: 16px; /* Inner padding */
+            border-radius: 8px; /* Rounds button corners */
+            font-size: 16px; /* Sets font size */
+            font-weight: bold; /* Bold text weight */
+            cursor: pointer; /* Changes cursor to pointer on hover */
+            text-align: left; /* Aligns button text to the left */
         }
 
-        .board-option-card {
-            background: #222;
-            border: 2px solid var(--border-color);
-            padding: 16px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .board-option-card { /* Card container layout for board choice selections */
+            background: #222; /* Dark card background fill */
+            border: 2px solid var(--border-color); /* Card border outline */
+            padding: 16px; /* Inner padding */
+            border-radius: 8px; /* Rounds card corners */
+            display: flex; /* Uses flexbox */
+            justify-content: space-between; /* Pushes content items to opposite edges */
+            align-items: center; /* Vertically centers card contents */
         }
 
-        .board-option-card.default-board {
-            border-color: var(--accent-green);
+        .board-option-card.default-board { /* Highlights default selected board option card */
+            border-color: var(--accent-green); /* Green accent border outline */
         }
 
-        .confirm-btn {
-            background: var(--accent-green);
-            color: #111;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
+        .confirm-btn { /* Style for confirmation action buttons */
+            background: var(--accent-green); /* Green background fill */
+            color: #111; /* Dark text color for high contrast */
+            border: none; /* Removes default borders */
+            padding: 8px 16px; /* Inner padding */
+            border-radius: 6px; /* Rounded corners */
+            font-weight: bold; /* Bold text weight */
+            cursor: pointer; /* Pointer cursor on hover */
         }
 
-        #game-screen {
-            align-items: center;
-            justify-content: center;
+        #game-screen { /* Dedicated styling adjustments for the active gameplay screen container */
+            align-items: center; /* Centers game canvas */
+            justify-content: center; /* Centers game canvas vertically */
         }
 
-        canvas {
-            background: #222;
-            border: 2px solid #444;
-            display: block;
-            width: 90vw;
-            height: 90vw;
-            max-width: 500px;
-            max-height: 500px;
+        canvas { /* Styling rules for the HTML5 canvas game board element */
+            background: #222; /* Canvas background fill color */
+            border: 2px solid #444; /* Canvas border outline */
+            display: block; /* Removes inline spacing gaps */
+            width: 90vw; /* Responsive width scaled to viewport width */
+            height: 90vw; /* Responsive height matching width to maintain square shape */
+            max-width: 500px; /* Maximum width cap */
+            max-height: 500px; /* Maximum height cap */
         }
 
-        .game-top-bar {
-            width: 100%;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
+        .game-top-bar { /* HUD top bar layout container above the game canvas */
+            width: 100%; /* Full width */
+            padding: 10px 20px; /* Inner padding */
+            display: flex; /* Flexbox layout */
+            justify-content: space-between; /* Spaces items across width */
+            align-items: center; /* Vertically centers bar items */
+            box-sizing: border-box; /* Includes padding in width calculation */
         }
     </style>
 </head>
-<body>
+<body> <!-- Document body containing all visible user interface screens -->
 
-    <div id="main-screen" class="screen active">
-        <div class="screen-header" style="justify-content: center;">
-            <h2 class="screen-title" style="padding-right: 0;">Modern Chess</h2>
+    <!-- Main Menu View Structure -->
+    <div id="main-screen" class="screen active"> <!-- Main menu screen container, initialized as active on load -->
+        <div class="screen-header" style="justify-content: center;"> <!-- Header wrapper centered for main menu title -->
+            <h2 class="screen-title" style="padding-right: 0;">Modern Chess</h2> <!-- Main application title header -->
         </div>
-        <div class="screen-body" style="justify-content: center;">
-            <button class="menu-btn" onclick="navigateTo('offline-options-screen')">Play Offline</button>
-            <button class="menu-btn" onclick="navigateTo('online-servers-screen')">Play Online</button>
-            <button class="menu-btn" onclick="navigateTo('manual-main-screen')">How to Play</button>
-            <button class="menu-btn" onclick="navigateTo('files-manager-screen')">Files Manager</button>
-            <button class="menu-btn" onclick="navigateTo('settings-screen')">Settings</button>
-            <div class="version-badge">v1.290</div>
+        <div class="screen-body" style="justify-content: center;"> <!-- Centered body wrapper for menu selection buttons -->
+            <button class="menu-btn" onclick="navigateTo('offline-options-screen')">Play Offline</button> <!-- Button to navigate to offline board selection screen -->
+            <button class="menu-btn" onclick="navigateTo('online-servers-screen')">Play Online</button> <!-- Button to navigate to online multiplayer servers screen -->
+            <button class="menu-btn" onclick="navigateTo('manual-main-screen')">How to Play</button> <!-- Button to navigate to rules and guide manual screen -->
+            <button class="menu-btn" onclick="navigateTo('files-manager-screen')">Files Manager</button> <!-- Button to navigate to saved map layouts manager screen -->
+            <button class="menu-btn" onclick="navigateTo('settings-screen')">Settings</button> <!-- Button to navigate to game audio and option settings screen -->
+
+
+
+
+            <div class="version-badge">v1.290</div> <!-- Version tag display badge at bottom of menu -->
+
+
+
+
+
         </div>
     </div>
 
-    <div id="offline-options-screen" class="screen">
-        <div class="screen-header">
-            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button>
-            <h2 class="screen-title">Select Board</h2>
+    <!-- Offline Options View Structure -->
+    <div id="offline-options-screen" class="screen"> <!-- Offline options selection screen container -->
+        <div class="screen-header"> <!-- Header container with back button and title -->
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button> <!-- Navigation button returning user to main menu -->
+            <h2 class="screen-title">Select Board</h2> <!-- Screen title heading -->
         </div>
-        <div class="screen-body">
-            <div class="board-option-card default-board">
-                <div class="board-info"><h3 style="margin:0;">Basic Board (Default)</h3></div>
-                <button class="confirm-btn" onclick="navigateTo('game-screen')">Confirm</button>
+        <div class="screen-body"> <!-- Scrollable body container for board options list -->
+            <div class="board-option-card default-board"> <!-- Card container representing the default game board layout choice -->
+                <div class="board-info"><h3 style="margin:0;">Basic Board (Default)</h3></div> <!-- Board title label text -->
+                <button class="confirm-btn" onclick="navigateTo('game-screen')">Confirm</button> <!-- Button confirming board selection and launching game screen -->
             </div>
         </div>
     </div>
 
-    <div id="game-screen" class="screen">
-        <div class="game-top-bar">
-            <button class="back-btn" onclick="navigateTo('offline-options-screen')">Back</button>
-            <span style="font-size: 11px; color: #aaa;"></span>
+    <!-- Online Servers View Structure -->
+    <div id="online-servers-screen" class="screen"> <!-- Online matchmaking servers selection screen container -->
+        <div class="screen-header"> <!-- Header container with back button and title -->
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button> <!-- Navigation button returning user to main menu -->
+            <h2 class="screen-title">Online Servers</h2> <!-- Screen title heading -->
         </div>
-        <div style="display:flex; justify-content:center; align-items:center; flex-grow:1;">
-            <canvas id="gameCanvas" width="540" height="540"></canvas>
+        <div class="screen-body" id="online-servers-body"> <!-- Body container holding dynamic online matchmaking content -->
         </div>
     </div>
 
-    <!-- Other screens omitted for brevity, keeping all scripts loaded below -->
-    <script>
-        function navigateTo(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-            document.getElementById(screenId).classList.add('active');
-        }
-    </script>
+    <!-- How To Play Manual View Structure -->
+    <div id="manual-main-screen" class="screen"> <!-- Rule manual and guide screen container -->
+        <div class="screen-header"> <!-- Header container with back button and title -->
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button> <!-- Navigation button returning user to main menu -->
+            <h2 class="screen-title">How to Play</h2> <!-- Screen title heading -->
+        </div>
+        <div class="screen-body" id="manual-body"> <!-- Body container holding gameplay instructions and rules content -->
+        </div>
+    </div>
+
+    <!-- Files Manager View Structure -->
+    <div id="files-manager-screen" class="screen"> <!-- Saved files and layout manager screen container -->
+        <div class="screen-header"> <!-- Header container with back button and title -->
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button> <!-- Navigation button returning user to main menu -->
+            <h2 class="screen-title">Files Manager</h2> <!-- Screen title heading -->
+        </div>
+        <div class="screen-body" id="files-manager-body"> <!-- Body container holding saved files management tools -->
+        </div>
+    </div>
+
+    <!-- Settings View Structure -->
+    <div id="settings-screen" class="screen"> <!-- Game settings options screen container -->
+        <div class="screen-header"> <!-- Header container with back button and title -->
+            <button class="back-btn" onclick="navigateTo('main-screen')">Back</button> <!-- Navigation button returning user to main menu -->
+            <h2 class="screen-title">Settings</h2> <!-- Screen title heading -->
+        </div>
+        <div class="screen-body" id="settings-body"> <!-- Body container holding audio and config settings controls -->
+        </div>
+    </div>
+
+    <!-- Active Game Session View Structure -->
+    <div id="game-screen" class="screen"> <!-- Active match gameplay screen container -->
+        <div class="game-top-bar"> <!-- HUD top header bar inside game screen -->
+            <button class="back-btn" onclick="navigateTo('offline-options-screen')">Back</button> <!-- Navigation button returning to board selection -->
+            <span style="font-size: 11px; color: #aaa;"></span> <!-- Extra spacer span tag -->
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; flex-grow:1;"> <!-- Centering wrapper for the game board canvas -->
+            <canvas id="gameCanvas" width="540" height="540"></canvas> <!-- HTML5 Canvas element where the chess game board and units are rendered -->
+        </div>
+    </div>
     
-    <!-- REQUIRED SCRIPT LOAD ORDER -->
-    <script src="map_setup.js"></script>
-    <script src="team_mechanics.js"></script>
-    <script src="unit_movement.js"></script>
+    <!-- REQUIRED ABSOLUTE CORE SCRIPT LOADERS -->
+    <script src="page_setup.js"></script> <!-- Loads screen navigation controller functions -->
+    <script src="map_setup.js"></script> <!-- Loads board grid layout and map configuration data -->
+    <script src="team_mechanics.js"></script> <!-- Loads team rules, superunit clusters, gold core captures, and rendering math -->
+    <script src="unit_movement.js"></script> <!-- Loads unit dragging, movement validation, and interactive click handlers -->
 </body>
 </html>
