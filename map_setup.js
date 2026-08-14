@@ -1,17 +1,28 @@
+// =========================================================================
+// MAP SETUP & ASSET INITIALIZATION CONTROLLER
+// =========================================================================
+
+// References the main canvas element from the HTML document DOM
 const canvas = document.getElementById('gameCanvas');
+// Acquires the 2D rendering context interface for drawing graphics on the canvas
 const ctx = canvas.getContext('2d');
 
+// Defines the total number of grid columns on the game board map
 const cols = 18;
+// Defines the total number of grid rows on the game board map
 const rows = 18;
+// Calculates individual cell pixel dimensions relative to total canvas width
 const cellSize = canvas.width / cols;
 
+// Linear interpolation mathematical utility function for smooth movement/transitions
 function lerp(start, end, t) {
     return start + (end - start) * t;
 }
 
+// Base CDN raw endpoint URL string pointing to remote repository assets
 const ghBase = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/';
 
-// Dynamic Loading Screen Overlay
+// Dynamic Loading Screen Overlay Element Creation
 const loadingOverlay = document.createElement('div');
 loadingOverlay.style.position = 'fixed';
 loadingOverlay.style.top = '0';
@@ -26,6 +37,7 @@ loadingOverlay.style.justifyContent = 'center';
 loadingOverlay.style.alignItems = 'center';
 loadingOverlay.style.color = '#ffffff';
 loadingOverlay.style.fontFamily = 'sans-serif';
+// Injects inner HTML markup elements for the loading progress indicator bar
 loadingOverlay.innerHTML = `
     <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
     <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
@@ -33,11 +45,14 @@ loadingOverlay.innerHTML = `
     </div>
     <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
 `;
+// Appends the loading overlay dynamically directly to the document body
 document.body.appendChild(loadingOverlay);
 
+// References to the progress bar and text percentage display elements
 const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
+// Array list containing all external remote asset file download links
 const assetUrls = [
     ghBase + 'map2.png',
     ghBase + 'blue_tank.jpg',
@@ -53,6 +68,7 @@ const assetUrls = [
 let loadedCount = 0;
 const totalAssets = assetUrls.length;
 
+// Image objects and corresponding boolean loaded state trackers
 let mapImg = new Image();
 let mapLoaded = false;
 
@@ -66,12 +82,14 @@ let redInfantryImg = new Image(), redInfantryLoaded = false;
 let redArtilleryImg = new Image(), redArtilleryLoaded = false;
 let redShipImg = new Image(), redShipLoaded = false;
 
+// Updates progress bar width and text percentage as assets finish loading
 function updateLoadingProgress() {
     loadedCount++;
     let percent = Math.floor((loadedCount / totalAssets) * 100);
     progressBar.style.width = percent + '%';
     progressText.innerText = percent + '%';
 
+    // Fades out and removes loading overlay once all assets have successfully loaded
     if (loadedCount >= totalAssets) {
         setTimeout(() => {
             loadingOverlay.style.opacity = '0';
@@ -81,6 +99,7 @@ function updateLoadingProgress() {
     }
 }
 
+// Robust asset loader function using fetch blob caching with fallback error handling
 function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
     fetch(url)
         .then(response => {
@@ -107,6 +126,7 @@ function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
         });
 }
 
+// Initiates background loading tasks for all map and unit textures
 loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
 loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
 loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
@@ -117,11 +137,13 @@ loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded
 loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
 loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
 
+// Determines terrain type classification based on specific grid coordinates
 function getTerrain(c, r) {
     const colChar = String.fromCharCode(65 + c);
     const rowNum = r + 1;
     const coord = colChar + rowNum;
 
+    // List of map coordinates designated as water terrain tiles
     const waterList = [
         'I5', 'J5', 'I6', 'J6', 'K6', 'H7', 'I7', 'J7', 'K7', 'G8', 'H8', 'I8', 'J8', 'K8', 
         'E9', 'F9', 'G9', 'H9', 'I9', 'J9', 'K9', 'L9', 'E10', 'F10', 'G10', 'H10', 'I10', 
@@ -153,12 +175,15 @@ function getTerrain(c, r) {
     return 'land';
 }
 
+// Utility check to determine if a terrain string qualifies as water
 function isWaterTerrain(terrain) {
     return terrain === 'water' || terrain === 'blue_navy' || terrain === 'red_navy';
 }
 
+// Global array holding active game units
 let units = [];
 
+// Retrieves array of coordinates corresponding to a team's base and core structures
 function getBaseSquares(team) {
     let squares = [];
     for (let r = 0; r < rows; r++) {
@@ -171,6 +196,7 @@ function getBaseSquares(team) {
     return squares;
 }
 
+// Finds the designated navy port square for a given team
 function getPortSquare(team) {
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -182,6 +208,7 @@ function getPortSquare(team) {
     return {c:0, r:0};
 }
 
+// Spawns initial combat units and ships for a specific team across valid board tiles
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
@@ -196,10 +223,10 @@ function spawnTeam(team) {
     let shipImgRef = isBlue ? blueShipImg : redShipImg;
     let shipLoadRef = () => isBlue ? blueShipLoaded : redShipLoaded;
 
-    // Ship spawns at the port
+    // Spawns navy ship directly at the team's designated port square
     units.push({ name: 'Ship', type: 'water', range: 2, gridX: port.c, gridY: port.r, x: port.c*cellSize, y: port.r*cellSize, img: shipImgRef, loaded: shipLoadRef });
 
-    // Helper to find a free spawn position starting from base squares and expanding outward into valid land tiles
+    // Breadth-first search helper to find unoccupied land spawn positions starting from bases
     function getAvailableLandPos() {
         let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
         if (availableBase.length > 0) {
@@ -240,22 +267,23 @@ function spawnTeam(team) {
         return baseSquares[0];
     }
 
-    // Spawn 3 Tanks
+    // Spawns 3 Tanks for the team
     for (let i = 0; i < 3; i++) {
         let pos = getAvailableLandPos();
         units.push({ name: 'Tank', type: 'land', range: 3, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: tankImgRef, loaded: tankLoadRef });
     }
 
-    // Spawn 5 Infantry
+    // Spawns 5 Infantry units for the team
     for (let i = 0; i < 5; i++) {
         let pos = getAvailableLandPos();
         units.push({ name: 'Infantry', type: 'land', range: 2, gridX: pos.c, gridY: pos.r, x: pos.c*cellSize, y: pos.r*cellSize, img: infImgRef, loaded: infLoadRef });
     }
 
-    // Spawn 1 Artillery
+    // Spawns 1 Artillery unit for the team
     let artPos = getAvailableLandPos();
     units.push({ name: 'Artillery', type: 'land', range: 2, gridX: artPos.c, gridY: artPos.r, x: artPos.c*cellSize, y: artPos.r*cellSize, img: artImgRef, loaded: artLoadRef });
 }
 
+// Triggers initial team spawning sequence for both factions
 spawnTeam('blue');
 spawnTeam('red');
