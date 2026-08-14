@@ -208,15 +208,20 @@ function tryMoveUnit(unit, newC, newR) {
     unit.gridY = newR;
 
     goldCores.forEach(core => {
-        let inZone = core.captureZones.some(z => z.c === newC && z.r === newR);
-        let currentTeam = getTeamFromUnit(unit);
-        if (inZone) {
+        // Strict Orthogonal Check Only (Top, Bottom, Left, Right of core)
+        let isOrthogonal = (Math.abs(core.c - newC) + Math.abs(core.r - newR) === 1);
+        
+        if (isOrthogonal) {
+            let currentTeam = getTeamFromUnit(unit);
             if (core.owner !== currentTeam) {
                 core.owner = currentTeam;
                 if (currentTeam === 'blue') blueCoins++;
                 else redCoins++;
+                flagAnimations[core.id] = performance.now();
+            } else {
+                // Play animation on re-step by owner, but do not increment coins
+                flagAnimations[core.id] = performance.now();
             }
-            flagAnimations[core.id] = performance.now();
         }
     });
 
@@ -280,14 +285,29 @@ function drawTeamUIAndFlags() {
         }
     });
 
+    let mapCenterX = canvas.width / 2;
+    let mapCenterY = canvas.height / 2;
+
     ['blue', 'red'].forEach(teamName => {
         let suList = getSuperunitsForTeam(teamName, units);
         suList.forEach(su => {
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
-            let badgeX = avgX + cellSize / 2 - 22;
-            let badgeY = avgY + cellSize / 2 - 12;
+            let unitCenterX = avgX + cellSize / 2;
+            let unitCenterY = avgY + cellSize / 2;
+
+            let dirX = mapCenterX - unitCenterX;
+            let dirY = mapCenterY - unitCenterY;
+            let length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+            
+            // Significant offset facing cleanly towards map center without overlapping
+            let significantDistance = cellSize * 1.8;
+            let offsetX = (dirX / length) * significantDistance;
+            let offsetY = (dirY / length) * significantDistance;
+
+            let badgeX = unitCenterX + offsetX - 22;
+            let badgeY = unitCenterY + offsetY - 12;
 
             ctx.fillStyle = '#cc0000';
             ctx.strokeStyle = '#ffffff';
