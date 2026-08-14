@@ -2,14 +2,12 @@
 // TEAM MECHANICS, COMBAT, AND CAPTURE CONTROLLER
 // =========================================================================
 
-// Global match state variables tracking turns, currency, and entities
 let currentTurn = 'blue';
 let blueCoins = 0;
 let redCoins = 0;
 let destroyedUnitsQueue = [];
 let flagAnimations = {};
 
-// Strategic Gold Core objectives configuration matrix
 let goldCores = [
     { id: 'gc1', c: 6, r: 4, owner: null, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}] },
     { id: 'gc2', c: 1, r: 5, owner: null, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}] },
@@ -20,21 +18,11 @@ let goldCores = [
 ];
 
 const TeamLog = {
-    info: function(message, data = null) {
-        console.log(`%c[INFO][team_mechanics]: ${message}`, 'color: #3498db; font-weight: bold;', data !== null ? data : '');
-    },
-    warn: function(message, data = null) {
-        console.warn(`%c[WARN][team_mechanics]: ${message}`, 'color: #f1c40f; font-weight: bold;', data !== null ? data : '');
-    },
-    error: function(message, errorDetails = null) {
-        console.error(`%c[ERROR][team_mechanics]: ${message}`, 'color: #e74c3c; font-weight: bold;', errorDetails !== null ? errorDetails : '');
-    },
-    success: function(message, data = null) {
-        console.log(`%c[SUCCESS][team_mechanics]: ${message}`, 'color: #2ecc71; font-weight: bold;', data !== null ? data : '');
-    }
+    info: (msg, data = null) => console.log(`[INFO][team_mechanics]: ${msg}`, data ?? ''),
+    warn: (msg, data = null) => console.warn(`[WARN][team_mechanics]: ${msg}`, data ?? ''),
+    success: (msg, data = null) => console.log(`[SUCCESS][team_mechanics]: ${msg}`, data ?? '')
 };
 
-// Determines team identity from unit object properties or image paths with spatial fallback
 function getTeamFromUnit(unit) {
     if (!unit) return null;
     if (unit._assignedTeam) return unit._assignedTeam;
@@ -58,7 +46,7 @@ function getTeamFromUnit(unit) {
 function getUnitPower(unit) {
     if (!unit) return 0;
     let name = (unit.name || '').toLowerCase();
-    if (name.includes('ship')) return Infinity; // Ships have infinite power to destroy anything
+    if (name.includes('ship')) return Infinity;
     if (name.includes('artillery') || name.includes('boat')) return 0;
     if (name.includes('tank')) return 2;
     if (name.includes('infantry') || name.includes('soldier')) return 1;
@@ -68,17 +56,15 @@ function getUnitPower(unit) {
 function isSpecialUnit(unit) {
     if (!unit) return false;
     let name = (unit.name || '').toLowerCase();
-    return name.includes('artillery') || name.includes('boat') || (getUnitPower(unit) === 0);
+    return name.includes('artillery') || name.includes('boat') || getUnitPower(unit) === 0;
 }
 
-// Evaluates Chebyshev connectivity distance between units
 function areUnitsAdjacent(u1, u2) {
     let dx = Math.abs(u1.gridX - u2.gridX);
     let dy = Math.abs(u1.gridY - u2.gridY);
     return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
 }
 
-// Groups team combat units into clusters/superunits including proxy bridge heuristics
 function getSuperunitsForTeam(teamName, allUnits) {
     let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName);
     let combatUnits = teamUnits.filter(u => !isSpecialUnit(u) && getUnitPower(u) !== Infinity);
@@ -153,27 +139,29 @@ function isUnitLockedInStalemate(unit, allUnits) {
     return false;
 }
 
-// Queues defeated units for disintegration visual animation
-function queueForDisintegration(unitList) {
-    unitList.forEach(u => {
+function commitUnitDestruction(unitsArray, unitsToDestroy) {
+    unitsToDestroy.forEach(u => {
+        let index = unitsArray.indexOf(u);
+        if (index !== -1) {
+            unitsArray.splice(index, 1);
+            TeamLog.success(`Unit immediately destroyed and removed from board: ${u.name}`);
+        }
         if (!destroyedUnitsQueue.some(item => item.unit === u)) {
             destroyedUnitsQueue.push({
                 unit: u,
                 startTime: performance.now(),
                 duration: 1800
             });
-            TeamLog.warn(`Unit queued for disintegration: ${u.name} at (${u.gridX}, ${u.gridY})`);
         }
     });
 }
 
-// Evaluates combat interactions and infinite passive ship range destruction rules
 function resolveUnitInteractions(allUnits) {
     let blueSuList = getSuperunitsForTeam('blue', allUnits);
     let redSuList = getSuperunitsForTeam('red', allUnits);
     let unitsToDestroy = new Set();
 
-    // 1. Superunit melee/contact combat resolution
+    // 1. Superunit & Single Unit Power Combat Resolution
     blueSuList.forEach(bSu => {
         redSuList.forEach(rSu => {
             let touching = bSu.units.some(bu => rSu.units.some(ru => areUnitsAdjacent(bu, ru) || (bu.gridX === ru.gridX && bu.gridY === ru.gridY)));
@@ -210,11 +198,10 @@ function resolveUnitInteractions(allUnits) {
     });
 
     if (unitsToDestroy.size > 0) {
-        queueForDisintegration(Array.from(unitsToDestroy));
+        commitUnitDestruction(allUnits, unitsToDestroy);
     }
 }
 
-// Executes movement logic and triggers interaction updates
 function tryMoveUnit(unit, newC, newR) {
     if (!unit) return false;
     if (isUnitLockedInStalemate(unit, units)) {
@@ -229,12 +216,16 @@ function tryMoveUnit(unit, newC, newR) {
     goldCores.forEach(core => {
         let inZone = core.captureZones.some(z => z.c === newC && z.r === newR);
         let currentTeam = getTeamFromUnit(unit);
-        if (inZone && core.owner !== currentTeam) {
-            core.owner = currentTeam;
-            if (currentTeam === 'blue') blueCoins++;
-            else redCoins++;
+        if (inZone) {
+            if (core.owner !== currentTeam) {
+                core.owner = currentTeam;
+                if (currentTeam === 'blue') blueCoins++;
+                else redCoins++;
+                TeamLog.success(`Gold Core '${core.id}' captured by ${currentTeam} team!`);
+            } else {
+                TeamLog.info(`Gold Core '${core.id}' re-stepped by owner ${currentTeam}.`);
+            }
             flagAnimations[core.id] = performance.now();
-            TeamLog.success(`Gold Core '${core.id}' captured by ${currentTeam} team!`);
         }
     });
 
@@ -244,11 +235,9 @@ function tryMoveUnit(unit, newC, newR) {
     return true;
 }
 
-// Master HUD, Turn Info, and flag rendering pass
 function drawTeamUIAndFlags() {
     let now = performance.now();
 
-    // Render turn & coin HUD overlay back on screen
     ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 2;
@@ -301,13 +290,14 @@ function drawTeamUIAndFlags() {
         }
     });
 
-    // Render superunit power badges with inward vector map centering
     let mapCenterX = canvas.width / 2;
     let mapCenterY = canvas.height / 2;
 
     ['blue', 'red'].forEach(teamName => {
         let suList = getSuperunitsForTeam(teamName, units);
         suList.forEach(su => {
+            if (su.units.length <= 1 && su.power !== Infinity) return; // Restrict badges to clusters or infinite units
+
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
@@ -344,15 +334,14 @@ function drawTeamUIAndFlags() {
         });
     });
 
-    // Handle disintegration animation queue frame rendering
     destroyedUnitsQueue = destroyedUnitsQueue.filter(item => {
         let elapsed = now - item.startTime;
         let progress = elapsed / item.duration;
         if (progress >= 1.0) return false;
 
         let u = item.unit;
-        let rx = u.renderX !== undefined ? u.renderX : u.gridX * cellSize;
-        let ry = u.renderY !== undefined ? u.renderY : u.gridY * cellSize;
+        let rx = u.gridX * cellSize;
+        let ry = u.gridY * cellSize;
 
         ctx.fillStyle = `rgba(255, 50, 50, ${1 - progress})`;
         ctx.fillRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
@@ -360,4 +349,4 @@ function drawTeamUIAndFlags() {
     });
 }
 
-TeamLog.info('Team mechanics and combat controller initialized successfully.');
+TeamLog.info('Team mechanics controller updated successfully.');
