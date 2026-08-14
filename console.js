@@ -11,7 +11,7 @@
         bottom: 10px;
         right: 10px;
         width: 420px;
-        height: 200px;
+        height: 32px;
         background: rgba(15, 15, 15, 0.9);
         border: 2px solid #333;
         border-radius: 6px;
@@ -45,7 +45,7 @@
     clearBtn.onclick = (e) => { e.stopPropagation(); logContent.innerHTML = ''; };
 
     const toggleBtn = document.createElement('button');
-    toggleBtn.innerText = '_';
+    toggleBtn.innerText = '+';
     toggleBtn.style.cssText = 'background:#444; color:#fff; border:none; padding:2px 8px; cursor:pointer; font-size:10px; border-radius:3px;';
     
     controls.appendChild(clearBtn);
@@ -57,7 +57,7 @@
         flex: 1;
         overflow-y: auto;
         padding: 8px;
-        display: flex;
+        display: none;
         flex-direction: column;
         gap: 4px;
         word-break: break-all;
@@ -67,13 +67,17 @@
     consoleContainer.appendChild(logContent);
     document.body.appendChild(consoleContainer);
 
-    // Toggle minimize/maximize
-    let isMinimized = false;
+    // Toggle minimize/maximize (starts minimized)
+    let isMinimized = true;
     toggleBtn.onclick = () => {
         isMinimized = !isMinimized;
         consoleContainer.style.height = isMinimized ? '32px' : '200px';
         logContent.style.display = isMinimized ? 'none' : 'flex';
         toggleBtn.innerText = isMinimized ? '+' : '_';
+    };
+
+    headerBar.onclick = () => {
+        toggleBtn.click();
     };
 
     // Logger helper function appending to UI & keeping standard console functionality
