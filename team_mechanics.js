@@ -10,13 +10,13 @@ let flagAnimations = {};
 let gameOver = false;
 let winnerMessage = '';
 
-// ALL gold cores are fully functional, plus 2 special base-cores (gc7 and gc8) acting as win conditions!
+// ALL gold cores (1 to 6) start NEUTRAL (owner: null), while gc7 and gc8 act as team base win-conditions.
 let goldCores = [
     { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
-    { id: 'gc2', c: 1, r: 5, owner: 'red', isBase: false, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, 
+    { id: 'gc2', c: 1, r: 5, owner: null, isBase: false, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, 
     { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
     { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
-    { id: 'gc5', c: 16, r: 12, owner: 'blue', isBase: false, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] },
+    { id: 'gc5', c: 16, r: 12, owner: null, isBase: false, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] },
     { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] },
     // gc7: Red Base Special Gold Core (placed at Red original base coordinate c:11, r:0 / L1)
     { id: 'gc7', c: 11, r: 0, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:11, r:1}, {c:10, r:0}, {c:12, r:0}, {c:10, r:1}, {c:12, r:1}] },
@@ -93,7 +93,6 @@ function checkWinConditions(allUnits) {
         return;
     }
 
-    // Win condition triggers ONLY if special base-cores gc7 or gc8 are captured by the opposing team
     goldCores.forEach(core => {
         if (core.isBase && core.owner && core.teamBase) {
             if (core.owner !== core.teamBase) {
