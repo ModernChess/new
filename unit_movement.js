@@ -1,3 +1,8 @@
+// =========================================================================
+// UNIT MOVEMENT, INTERACTION, AND RENDERING LOOP CONTROLLER
+// =========================================================================
+
+// State variables tracking selected units, path options, and touch timers
 let selectedUnit = null;     
 let legalMoves = [];         
 let targetTile = null;       
@@ -5,6 +10,7 @@ let pressTimer = null;
 let rangeMode = false;
 let rangeSquares = [];
 
+// Translates regular grid coordinates into a larger map scale coordinate set
 function getLargerCoord(c, r) {
     const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
     const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
@@ -15,6 +21,7 @@ function getLargerCoord(c, r) {
     return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
+// Calculates combat attack range coverage areas for specialized units like ships and artillery
 function getUnitCombatRange(unit) {
     let maxDist = (unit.name === 'Ship') ? 1 : (unit.name === 'Artillery' ? 3 : 0);
     if (maxDist === 0) return [];
@@ -43,6 +50,7 @@ function getUnitCombatRange(unit) {
     return results;
 }
 
+// Determines all legal movement path tiles available to a specific unit type
 function getLegalMoves(unit) {
     let moves = [];
     let maxRange = unit.range;
@@ -83,6 +91,7 @@ function getLegalMoves(unit) {
     return moves;
 }
 
+// Pointer down event listener handling unit long-press selections and movement execution clicks
 canvas.addEventListener('pointerdown', (e) => {
     let rect = canvas.getBoundingClientRect();
     let scaleX = canvas.width / rect.width;
@@ -100,9 +109,10 @@ canvas.addEventListener('pointerdown', (e) => {
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
             if (unitTeam !== currentTurn) {
-                return; // Cannot select opponent units on wrong turn
+                return; // Prevents selecting opponent units during the wrong faction's turn
             }
 
+            // Requires a 500ms long press gesture to select a unit
             pressTimer = setTimeout(() => {
                 selectedUnit = clickedUnit;
                 legalMoves = getLegalMoves(clickedUnit);
@@ -110,6 +120,7 @@ canvas.addEventListener('pointerdown', (e) => {
                 rangeMode = false; 
             }, 500); 
         } else {
+            // Checks if click targets the combat range action toggle button for ships/artillery
             if (selectedUnit && (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery')) {
                 let btnX = selectedUnit.renderX + cellSize + 12;
                 let btnY = selectedUnit.renderY - 12;
@@ -122,12 +133,13 @@ canvas.addEventListener('pointerdown', (e) => {
                 }
             }
 
+            // Processes valid tile selections for moving the currently selected unit
             if (selectedUnit && !rangeMode) {
                 let isLegal = legalMoves.some(m => m.c === c && m.r === r);
                 if (isLegal) {
                     if (targetTile && targetTile.c === c && targetTile.r === r) {
                         
-                        // PASS MOVE TO TEAM MECHANICS
+                        // Submits movement coordinates to team mechanics control handler
                         let success = tryMoveUnit(selectedUnit, c, r);
                         if (success) {
                             selectedUnit = null;
@@ -144,9 +156,11 @@ canvas.addEventListener('pointerdown', (e) => {
     }
 });
 
+// Clears timers if pointer is lifted or canceled before a long press completes
 canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 
+// Main game rendering and update loop executed every animation frame
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -157,11 +171,12 @@ function update() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // DRAW HUD & TEAM FLAGS OVERLAY
+    // Renders HUD interfaces and team flag overlays
     if (typeof drawTeamUIAndFlags === 'function') {
         drawTeamUIAndFlags();
     }
 
+    // Updates unit positions with smooth linear interpolation and subtle idle motion jitter
     units.forEach(u => {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
@@ -173,12 +188,14 @@ function update() {
         u.renderX = u.x + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
         u.renderY = u.y + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
 
+        // Draws drop shadows underneath units
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
         ctx.arc(u.renderX + cellSize / 2, u.renderY + cellSize - 8, cellSize * 0.35, 0, Math.PI * 2);
         ctx.fill();
     });
 
+    // Draws selection highlights, legal path outlines, and action buttons for selected units
     if (selectedUnit) {
         if (rangeMode) {
             ctx.strokeStyle = '#ffffff'; 
@@ -202,6 +219,7 @@ function update() {
             ctx.strokeRect(selectedUnit.renderX + 2, selectedUnit.renderY + 2, cellSize - 4, cellSize - 4);
         }
 
+        // Renders range toggle button next to valid combat units
         if (selectedUnit.name === 'Ship' || selectedUnit.name === 'Artillery') {
             let btnX = selectedUnit.renderX + cellSize + 12;
             let btnY = selectedUnit.renderY - 12;
@@ -219,19 +237,23 @@ function update() {
         }
     }
 
+    // Highlights target destination tile
     if (targetTile && !rangeMode) {
         ctx.strokeStyle = '#00ff00';
         ctx.lineWidth = 4;
         ctx.strokeRect(targetTile.c * cellSize + 2, targetTile.r * cellSize + 2, cellSize - 4, cellSize - 4);
     }
 
+    // Draws unit sprite images onto the canvas board
     units.forEach(u => {
         if (u.loaded && u.loaded()) {
             ctx.drawImage(u.img, u.renderX + 2, u.renderY + 2, cellSize - 4, cellSize - 4);
         }
     });
 
+    // Requests next animation frame loop tick
     requestAnimationFrame(update);
 }
 
+// Kicks off the continuous rendering loop execution cycle
 update();
