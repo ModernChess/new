@@ -32,8 +32,8 @@ const TeamLog = {
 
 function getTeamFromUnit(unit) {
     if (!unit) return null;
-    if (unit._assignedTeam) return unit._assignedTeam;
     if (unit.team) return unit.team.toLowerCase();
+    if (unit._assignedTeam) return unit._assignedTeam;
     
     let nameStr = (unit.name || '').toLowerCase();
     if (nameStr.includes('red') || nameStr.includes('black')) return 'red';
@@ -316,6 +316,97 @@ function tryMoveUnit(unit, newC, newR) {
     resolveUnitInteractions(units);
     currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
     return true;
+}
+
+// Shop integration functions for purchasing units using gold coins
+function toggleShop() {
+    let modal = document.getElementById('shop-modal');
+    if (!modal) return;
+    modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+}
+
+function buyUnit(unitType) {
+    if (gameOver) return;
+
+    let activeTeam = currentTurn;
+    let cost = 0;
+    let unitName = '';
+    let unitRange = 2;
+    let unitCategory = 'land';
+    let imgRef, loadRef;
+
+    if (activeTeam === 'blue') {
+        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = blueInfantryImg; loadRef = () => blueInfantryLoaded; }
+        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = blueTankImg; loadRef = () => blueTankLoaded; }
+        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = blueArtilleryImg; loadRef = () => blueArtilleryLoaded; }
+        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = blueShipImg; loadRef = () => blueShipLoaded; }
+    } else {
+        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = redInfantryImg; loadRef = () => redInfantryLoaded; }
+        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = redTankImg; loadRef = () => redTankLoaded; }
+        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = redArtilleryImg; loadRef = () => redArtilleryLoaded; }
+        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = redShipImg; loadRef = () => redShipLoaded; }
+    }
+
+    let currentCoins = activeTeam === 'blue' ? blueCoins : redCoins;
+    if (currentCoins < cost) {
+        TeamLog.warn(`Not enough gold to buy ${unitType}! Required: ${cost}, Available: ${currentCoins}`);
+        alert(`Not enough gold! You need ${cost} gold coins.`);
+        return;
+    }
+
+    // Deduct coins
+    if (activeTeam === 'blue') blueCoins -= cost;
+    else redCoins -= cost;
+
+    // Determine spawn position (base squares or port square for ships)
+    let spawnPos = null;
+    if (unitCategory === 'water') {
+        spawnPos = getPortSquare(activeTeam);
+    } else {
+        let baseSquares = getBaseSquares(activeTeam);
+        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
+        if (availableBase.length > 0) {
+            spawnPos = availableBase[0];
+        } else {
+            spawnPos = baseSquares[0] || {c: 0, r: 0};
+        }
+    }
+
+    if (unitType === 'infantry') {
+        // Buy 2x infantry for 1 gold
+        for (let i = 0; i < 2; i++) {
+            let pos = i === 0 ? spawnPos : (getBaseSquares(activeTeam).find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r)) || spawnPos);
+            units.push({
+                name: unitName,
+                type: unitCategory,
+                range: unitRange,
+                gridX: pos.c,
+                gridY: pos.r,
+                x: pos.c * cellSize,
+                y: pos.r * cellSize,
+                img: imgRef,
+                loaded: loadRef,
+                team: activeTeam
+            });
+        }
+        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 2x Infantry via shop!`);
+    } else {
+        units.push({
+            name: unitName,
+            type: unitCategory,
+            range: unitRange,
+            gridX: spawnPos.c,
+            gridY: spawnPos.r,
+            x: spawnPos.c * cellSize,
+            y: spawnPos.r * cellSize,
+            img: imgRef,
+            loaded: loadRef,
+            team: activeTeam
+        });
+        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 1x ${unitName} via shop!`);
+    }
+
+    toggleShop();
 }
 
 function drawTeamUIAndFlags() {
