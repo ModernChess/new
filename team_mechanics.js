@@ -181,6 +181,9 @@ function resolveUnitInteractions(allUnits) {
             allUnits.forEach(targetUnit => {
                 let targetTeam = getTeamFromUnit(targetUnit);
                 if (targetTeam && targetTeam !== shipTeam) {
+                    let targetName = (targetUnit.name || '').toLowerCase();
+                    if (targetName.includes('ship')) return; // Ships do not destroy ships at range
+
                     let inRange = combatRanges.some(rangeBox => 
                         targetUnit.gridX >= rangeBox.startC && targetUnit.gridX <= rangeBox.endC &&
                         targetUnit.gridY >= rangeBox.startR && targetUnit.gridY <= rangeBox.endR
@@ -208,19 +211,18 @@ function tryMoveUnit(unit, newC, newR) {
     unit.gridY = newR;
 
     goldCores.forEach(core => {
-        // Strict Orthogonal Check Only (Top, Bottom, Left, Right of core)
-        let isOrthogonal = (Math.abs(core.c - newC) + Math.abs(core.r - newR) === 1);
-        
-        if (isOrthogonal) {
+        // Allow BOTH orthogonal and diagonal adjacent tiles (Chebyshev distance <= 1)
+        let isAdjacentToCore = Math.abs(core.c - newC) <= 1 && Math.abs(core.r - newR) <= 1;
+
+        if (isAdjacentToCore) {
             let currentTeam = getTeamFromUnit(unit);
+            
+            // Only trigger capture and flag animation if unowned or owned by the enemy team
             if (core.owner !== currentTeam) {
                 core.owner = currentTeam;
                 if (currentTeam === 'blue') blueCoins++;
                 else redCoins++;
-                flagAnimations[core.id] = performance.now();
-            } else {
-                // Play animation on re-step by owner, but do not increment coins
-                flagAnimations[core.id] = performance.now();
+                flagAnimations[core.id] = performance.now(); // Play animation only on fresh/enemy capture
             }
         }
     });
@@ -301,7 +303,6 @@ function drawTeamUIAndFlags() {
             let dirY = mapCenterY - unitCenterY;
             let length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
             
-            // Significant offset facing cleanly towards map center without overlapping
             let significantDistance = cellSize * 1.8;
             let offsetX = (dirX / length) * significantDistance;
             let offsetY = (dirY / length) * significantDistance;
