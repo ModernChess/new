@@ -2,7 +2,6 @@
 // UNIT MOVEMENT, INTERACTION, AND RENDERING LOOP CONTROLLER
 // =========================================================================
 
-// State variables tracking selected units, path options, and touch timers
 let selectedUnit = null;     
 let legalMoves = [];         
 let targetTile = null;       
@@ -10,42 +9,21 @@ let pressTimer = null;
 let rangeMode = false;
 let rangeSquares = [];
 
-// =========================================================================
-// CONSOLE LOGGING & ERROR VALIDATION SYSTEM
-// =========================================================================
 const SystemLog = {
-    info: function(message, data = null) {
-        console.log(`%c[INFO][unit_movement]: ${message}`, 'color: #3498db; font-weight: bold;', data !== null ? data : '');
-    },
-    warn: function(message, data = null) {
-        console.warn(`%c[WARN][unit_movement]: ${message}`, 'color: #f1c40f; font-weight: bold;', data !== null ? data : '');
-    },
-    error: function(message, errorDetails = null) {
-        console.error(`%c[ERROR][unit_movement]: ${message}`, 'color: #e74c3c; font-weight: bold;', errorDetails !== null ? errorDetails : '');
-    },
-    success: function(message, data = null) {
-        console.log(`%c[SUCCESS][unit_movement]: ${message}`, 'color: #2ecc71; font-weight: bold;', data !== null ? data : '');
-    }
+    info: (msg, data = null) => console.log(`[INFO][unit_movement]: ${msg}`, data ?? ''),
+    warn: (msg, data = null) => console.warn(`[WARN][unit_movement]: ${msg}`, data ?? ''),
+    error: (msg, data = null) => console.error(`[ERROR][unit_movement]: ${msg}`, data ?? ''),
+    success: (msg, data = null) => console.log(`[SUCCESS][unit_movement]: ${msg}`, data ?? '')
 };
 
-// Validates coordinate bounds to safeguard against out-of-range map queries
 function validateCoordinates(c, r, maxCols = cols, maxRows = rows) {
-    if (typeof c !== 'number' || typeof r !== 'number' || isNaN(c) || isNaN(r)) {
-        SystemLog.error(`Invalid coordinate types passed: c=${c}, r=${r}`);
-        return false;
-    }
-    if (c < 0 || c >= maxCols || r < 0 || r >= maxRows) {
-        SystemLog.warn(`Coordinates out of bounds: (${c}, ${r}). Max bounds: ${maxCols}x${maxRows}`);
-        return false;
-    }
+    if (typeof c !== 'number' || typeof r !== 'number' || isNaN(c) || isNaN(r)) return false;
+    if (c < 0 || c >= maxCols || r < 0 || r >= maxRows) return false;
     return true;
 }
 
-// Translates regular grid coordinates into a larger map scale coordinate set
 function getLargerCoord(c, r) {
-    if (!validateCoordinates(c, r)) {
-        return { col: 'Al', row: '1l', colIdx: 0, rowIdx: 0 };
-    }
+    if (!validateCoordinates(c, r)) return { col: 'Al', row: '1l', colIdx: 0, rowIdx: 0 };
 
     const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
     const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
@@ -57,17 +35,11 @@ function getLargerCoord(c, r) {
     return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
-// Calculates combat attack range coverage areas for specialized units like ships and artillery
 function getUnitCombatRange(unit) {
-    if (!unit) {
-        SystemLog.error('getUnitCombatRange called with a null or undefined unit.');
-        return [];
-    }
+    if (!unit) return [];
 
     let maxDist = ((unit.name || '').includes('Ship')) ? 1 : ((unit.name || '').includes('Artillery') ? 3 : 0);
-    if (maxDist === 0) {
-        return [];
-    }
+    if (maxDist === 0) return [];
 
     let currentLg = getLargerCoord(unit.gridX, unit.gridY);
     let results = [];
@@ -94,7 +66,6 @@ function getUnitCombatRange(unit) {
     return results;
 }
 
-// Determines all legal movement path tiles available to a specific unit type
 function getLegalMoves(unit) {
     if (!unit) return [];
 
@@ -118,9 +89,7 @@ function getLegalMoves(unit) {
             let nr = cy + (dir.dy * step);
 
             if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
-                if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) {
-                    break;
-                }
+                if (typeof isGoldCore === 'function' && isGoldCore(nc, nr)) break;
 
                 let terrain = getTerrain(nc, nr);
                 let isWater = isWaterTerrain(terrain);
@@ -140,7 +109,6 @@ function getLegalMoves(unit) {
     return moves;
 }
 
-// Pointer down event listener handling unit long-press selections and movement execution clicks
 canvas.addEventListener('pointerdown', (e) => {
     let rect = canvas.getBoundingClientRect();
     let scaleX = canvas.width / rect.width;
@@ -159,17 +127,13 @@ canvas.addEventListener('pointerdown', (e) => {
 
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
-            if (unitTeam !== currentTurn) {
-                SystemLog.warn(`Turn validation failed: Attempted to select ${unitTeam} unit during ${currentTurn}'s turn.`);
-                return; 
-            }
+            if (unitTeam !== currentTurn) return; 
 
             pressTimer = setTimeout(() => {
                 selectedUnit = clickedUnit;
                 legalMoves = getLegalMoves(clickedUnit);
                 targetTile = null; 
                 rangeMode = false; 
-                SystemLog.success(`Successfully selected unit: ${selectedUnit.name} at grid (${c}, ${r})`);
             }, 500); 
         } else {
             if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
@@ -206,7 +170,6 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointerup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
 
-// Main game rendering and update loop executed every animation frame
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -225,12 +188,11 @@ function update() {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
         
-        u.x = lerp(u.x, targetX, 0.025);
-        u.y = lerp(u.y, targetY, 0.025);
+        u.x = lerp(u.x, targetX, 0.05);
+        u.y = lerp(u.y, targetY, 0.05);
 
-        let isMoving = Math.abs(u.x - targetX) > 0.1 || Math.abs(u.y - targetY) > 0.1;
-        u.renderX = u.x + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
-        u.renderY = u.y + (isMoving ? (Math.random() - 0.5) * 1.2 : 0);
+        u.renderX = u.x;
+        u.renderY = u.y;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
@@ -293,5 +255,5 @@ function update() {
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement and interaction controller initialized successfully.');
+SystemLog.info('Unit movement controller updated successfully.');
 update();
