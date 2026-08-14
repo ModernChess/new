@@ -10,6 +10,16 @@ let flagAnimations = {};
 let gameOver = false;
 let winnerMessage = '';
 
+// ARTILLERY CARD DUEL SYSTEM EXTENSION STATE
+let artilleryDuelState = {
+    active: false,
+    attackerTeam: null,
+    defenderTeam: null,
+    artilleryUnit: null,
+    targetUnit: null,
+    attackerCard: null // 'green' or 'red'
+};
+
 // ALL gold cores (1 to 6) start NEUTRAL (owner: null), while gc7 and gc8 act as team base win-conditions.
 let goldCores = [
     { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
@@ -262,6 +272,69 @@ function resolveUnitInteractions(allUnits) {
     }
 
     checkWinConditions(allUnits);
+}
+
+// ARTILLERY CARD DUEL TRIGGER AND RESOLUTION FUNCTIONS
+function triggerArtilleryDuel(artilleryUnit, targetUnit) {
+    if (gameOver) return;
+    
+    artilleryDuelState = {
+        active: true,
+        attackerTeam: getTeamFromUnit(artilleryUnit),
+        defenderTeam: getTeamFromUnit(targetUnit),
+        artilleryUnit: artilleryUnit,
+        targetUnit: targetUnit,
+        attackerCard: null
+    };
+
+    TeamLog.info(`Artillery duel initiated by ${artilleryDuelState.attackerTeam.toUpperCase()} against ${artilleryDuelState.defenderTeam.toUpperCase()}! Attacker choosing card.`);
+    showArtilleryCardModal('attacker');
+}
+
+function attackerChooseCard(cardColor) {
+    if (!artilleryDuelState.active) return;
+    
+    artilleryDuelState.attackerCard = cardColor;
+    TeamLog.info(`Attacker locked in their card choice. Handing over to defender for guessing.`);
+    showArtilleryCardModal('defender');
+}
+
+function resolveArtilleryDuel(defenderGuess) {
+    if (!artilleryDuelState.active) return;
+
+    let { defenderTeam, targetUnit, attackerCard } = artilleryDuelState;
+    let unitsToDestroy = new Set();
+
+    TeamLog.info(`Defender guessed: ${defenderGuess}. Attacker's card was: ${attackerCard}.`);
+
+    if (defenderGuess === attackerCard) {
+        TeamLog.success(`${defenderTeam.toUpperCase()} successfully guessed the card! Artillery attack failed, target unit saved.`);
+        alert(`Defense Success! ${defenderTeam.toUpperCase()} guessed correctly. Artillery strike neutralized!`);
+    } else {
+        TeamLog.warn(`${defenderTeam.toUpperCase()} guessed incorrectly! Artillery strike successful.`);
+        unitsToDestroy.add(targetUnit);
+        commitUnitDestruction(units, unitsToDestroy);
+        alert(`Attack Success! ${defenderTeam.toUpperCase()} guessed wrong. Target destroyed!`);
+    }
+
+    artilleryDuelState.active = false;
+    currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
+    hideArtilleryCardModal();
+    checkWinConditions(units);
+}
+
+function showArtilleryCardModal(phase) {
+    let modal = document.getElementById('artillery-card-modal');
+    if (!modal) {
+        TeamLog.info(`[UI Modal Phase: ${phase}] Waiting for user card selection input...`);
+        return;
+    }
+    modal.style.display = 'block';
+}
+
+function hideArtilleryCardModal() {
+    let modal = document.getElementById('artillery-card-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 function tryMoveUnit(unit, newC, newR) {
