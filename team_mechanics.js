@@ -160,11 +160,16 @@ function resolveUnitInteractions(allUnits) {
     let redSuList = getSuperunitsForTeam('red', allUnits);
     let unitsToDestroy = new Set();
 
+    // 1. MELEE RESOLUTION (Tanks, Infantry, and Ship-vs-Ship touch/melee destruction)
     blueSuList.forEach(bSu => {
         redSuList.forEach(rSu => {
             let touching = bSu.units.some(bu => rSu.units.some(ru => areUnitsAdjacent(bu, ru) || (bu.gridX === ru.gridX && bu.gridY === ru.gridY)));
             if (touching) {
-                if (bSu.power > rSu.power) {
+                if (bSu.power === Infinity && rSu.power === Infinity) {
+                    // Ship vs Ship touching: destroy both mutually
+                    bSu.units.forEach(u => unitsToDestroy.add(u));
+                    rSu.units.forEach(u => unitsToDestroy.add(u));
+                } else if (bSu.power > rSu.power) {
                     rSu.units.forEach(u => unitsToDestroy.add(u));
                 } else if (rSu.power > bSu.power) {
                     bSu.units.forEach(u => unitsToDestroy.add(u));
@@ -173,16 +178,15 @@ function resolveUnitInteractions(allUnits) {
         });
     });
 
+    // 2. RANGE RESOLUTION (Ship Range Strike - skips other ships)
     allUnits.forEach(ship => {
-        let shipTeam = getTeamFromUnit(ship);
         let shipName = (ship.name || '').toLowerCase();
-        if (shipName.includes('ship') && typeof getUnitCombatRange === 'function') {
+        if (shipName.includes('ship')) {
             let combatRanges = getUnitCombatRange(ship);
             allUnits.forEach(targetUnit => {
-                let targetTeam = getTeamFromUnit(targetUnit);
-                if (targetTeam && targetTeam !== shipTeam) {
+                if (getTeamFromUnit(targetUnit) !== getTeamFromUnit(ship)) {
                     let targetName = (targetUnit.name || '').toLowerCase();
-                    if (targetName.includes('ship')) return; // Ships do not destroy ships at range
+                    if (targetName.includes('ship')) return; // Ships do NOT destroy ships at range
 
                     let inRange = combatRanges.some(rangeBox => 
                         targetUnit.gridX >= rangeBox.startC && targetUnit.gridX <= rangeBox.endC &&
@@ -211,18 +215,16 @@ function tryMoveUnit(unit, newC, newR) {
     unit.gridY = newR;
 
     goldCores.forEach(core => {
-        // Allow BOTH orthogonal and diagonal adjacent tiles (Chebyshev distance <= 1)
         let isAdjacentToCore = Math.abs(core.c - newC) <= 1 && Math.abs(core.r - newR) <= 1;
 
         if (isAdjacentToCore) {
             let currentTeam = getTeamFromUnit(unit);
             
-            // Only trigger capture and flag animation if unowned or owned by the enemy team
             if (core.owner !== currentTeam) {
                 core.owner = currentTeam;
                 if (currentTeam === 'blue') blueCoins++;
                 else redCoins++;
-                flagAnimations[core.id] = performance.now(); // Play animation only on fresh/enemy capture
+                flagAnimations[core.id] = performance.now();
             }
         }
     });
@@ -293,6 +295,9 @@ function drawTeamUIAndFlags() {
     ['blue', 'red'].forEach(teamName => {
         let suList = getSuperunitsForTeam(teamName, units);
         suList.forEach(su => {
+            // RESTRICTION: Only show power labels for actual multi-unit clusters or infinite power units (Ships). Skip single non-infinite units.
+            if (su.units.length <= 1 && su.power !== Infinity) return;
+
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
