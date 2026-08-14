@@ -161,6 +161,87 @@
             align-items: center;
             box-sizing: border-box;
         }
+
+        /* Shop UI Button & Modal Styles */
+        #shop-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #f1c40f;
+            color: #121212;
+            border: none;
+            padding: 8px 14px;
+            font-weight: bold;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            z-index: 10;
+            transition: background 0.2s;
+        }
+        #shop-btn:hover {
+            background-color: #f39c12;
+        }
+        #shop-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            border: 2px solid #f1c40f;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            z-index: 20;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            box-sizing: border-box;
+        }
+        #shop-modal h3 {
+            margin-top: 0;
+            color: #f1c40f;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 16px;
+        }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .shop-item button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .shop-item button:hover {
+            background-color: #2ecc71;
+        }
+        #close-shop {
+            width: 100%;
+            margin-top: 12px;
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #close-shop:hover {
+            background-color: #e74c3c;
+        }
     </style>
 </head>
 <body> <!-- Document body containing all UI screen views -->
@@ -198,10 +279,32 @@
     <div id="game-screen" class="screen">
         <div class="game-top-bar">
             <button class="back-btn" onclick="navigateTo('offline-options-screen')">Back</button>
-            <span style="font-size: 11px; color: #aaa;"></span>
+            <button id="shop-btn" onclick="toggleShop()">🛒 Open Shop</button>
         </div>
-        <div style="display:flex; justify-content:center; align-items:center; flex-grow:1;">
+        <div style="display:flex; justify-content:center; align-items:center; flex-grow:1; position:relative;">
             <canvas id="gameCanvas" width="540" height="540"></canvas>
+
+            <!-- Shop Modal Menu -->
+            <div id="shop-modal">
+                <h3>Unit Recruitment Shop</h3>
+                <div class="shop-item">
+                    <span>2x Infantry (1 Gold)</span>
+                    <button onclick="buyUnit('infantry')">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <span>1x Tank (1 Gold)</span>
+                    <button onclick="buyUnit('tank')">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <span>1x Artillery (2 Gold)</span>
+                    <button onclick="buyUnit('artillery')">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <span>1x Ship (2 Gold)</span>
+                    <button onclick="buyUnit('ship')">Buy</button>
+                </div>
+                <button id="close-shop" onclick="toggleShop()">Close Shop</button>
+            </div>
         </div>
     </div>
 
@@ -235,8 +338,6 @@
             console.log("[SUCCESS][index_html] Window fully loaded, all assets and styles initialized.");
         });
     </script>
-
-
 
     <!-- REQUIRED SCRIPT LOAD ORDER -->
     <script src="console.js" onerror="console.error('[ERROR][index_html] Failed to load script: console.js');"></script>
