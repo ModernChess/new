@@ -1,10 +1,10 @@
 // --- TEAM & TURN STATE ---
-let currentTurn = 'blue';
-let blueCoins = 0;
-let redCoins = 0;
+let currentTurn = 'blue'; // Tracks whose turn it currently is ('blue' or 'red')
+let blueCoins = 0;        // Keeps score of gold cores captured by the blue team
+let redCoins = 0;         // Keeps score of gold cores captured by the red team
 
-let flagAnimations = {}; 
-let destroyedUnitsQueue = [];
+let flagAnimations = {};  // Stores active drop animation data for captured flags
+let destroyedUnitsQueue = []; // Holds units currently playing the disintegration animation before removal
 
 // Precise Gold Cores and strict Excel-mapped capture zones
 let goldCores = [
@@ -35,100 +35,108 @@ let goldCores = [
 ];
 
 // Load Flag Images
-let blueFlagImg = new Image();
-blueFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/blue_flag.jpg';
-let blueFlagLoaded = false;
-blueFlagImg.onload = () => { blueFlagLoaded = true; };
+let blueFlagImg = new Image(); // Creates image object for blue team's flag
+blueFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/blue_flag.jpg'; // Sets source URL for blue flag asset
+let blueFlagLoaded = false; // Flag status tracking to ensure image is fully downloaded before drawing
+blueFlagImg.onload = () => { blueFlagLoaded = true; }; // Sets ready status once image downloads
 
-let redFlagImg = new Image();
-redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red_flag.jpg';
-let redFlagLoaded = false;
-redFlagImg.onload = () => { redFlagLoaded = true; };
+let redFlagImg = new Image(); // Creates image object for red team's flag
+redFlagImg.src = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/red_flag.jpg'; // Sets source URL for red flag asset
+let redFlagLoaded = false; // Flag status tracking for red flag asset
+redFlagImg.onload = () => { redFlagLoaded = true; }; // Sets ready status once image downloads
 
+// Determines which team ('blue' or 'red') a given unit belongs to based on properties or board position
 function getTeamFromUnit(unit) {
-    if (!unit) return 'blue';
-    if (unit._assignedTeam) return unit._assignedTeam;
+    if (!unit) return 'blue'; // Fallback default if unit is null/undefined
+    if (unit._assignedTeam) return unit._assignedTeam; // Returns cached team if already evaluated
     
     if (unit.team) {
-        unit._assignedTeam = unit.team.toLowerCase();
+        unit._assignedTeam = unit.team.toLowerCase(); // Caches and returns explicit team property
         return unit._assignedTeam;
     }
     if (unit.name) {
         let name = unit.name.toLowerCase();
-        if (name.includes('red') || name.includes('black')) { unit._assignedTeam = 'red'; return 'red'; }
-        if (name.includes('blue') || name.includes('white')) { unit._assignedTeam = 'blue'; return 'blue'; }
+        if (name.includes('red') || name.includes('black')) { unit._assignedTeam = 'red'; return 'red'; } // Detects red team from name
+        if (name.includes('blue') || name.includes('white')) { unit._assignedTeam = 'blue'; return 'blue'; } // Detects blue team from name
     }
     if (unit.img && unit.img.src) {
         let src = unit.img.src.toLowerCase();
-        if (src.includes('red') || src.includes('black')) { unit._assignedTeam = 'red'; return 'red'; }
+        if (src.includes('red') || src.includes('black')) { unit._assignedTeam = 'red'; return 'red'; } // Detects team from image file URL path
         if (src.includes('blue') || src.includes('white')) { unit._assignedTeam = 'blue'; return 'blue'; }
     }
     
-    unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue';
+    unit._assignedTeam = (unit.gridY < 9) ? 'red' : 'blue'; // Spatial fallback: top half grid rows are red, bottom half are blue
     return unit._assignedTeam;
 }
 
+// Calculates the strategic combat power value of a specific unit type
 function getUnitPower(unit) {
-    if (!unit) return 0;
+    if (!unit) return 0; // Null check returns 0 power
     let name = (unit.name || '').toLowerCase();
-    if (name.includes('artillery') || name.includes('ship') || name.includes('boat')) return 0;
-    if (unit.power !== undefined && name.includes('artillery') === false && name.includes('ship') === false) return unit.power;
-    if (name.includes('tank')) return 2;
-    if (name.includes('infantry') || name.includes('soldier')) return 1;
-    return 1; 
+    if (name.includes('artillery') || name.includes('ship') || name.includes('boat')) return 0; // Special units contribute 0 frontline power weight
+    if (unit.power !== undefined && name.includes('artillery') === false && name.includes('ship') === false) return unit.power; // Uses custom assigned unit power if present
+    if (name.includes('tank')) return 2; // Tanks have a baseline power value of 2
+    if (name.includes('infantry') || name.includes('soldier')) return 1; // Infantry units have a baseline power value of 1
+    return 1; // Default fallback unit power
 }
 
+// Identifies whether a unit is a non-standard combat entity (Artillery, Ship, Boat, or 0-power unit)
 function isSpecialUnit(unit) {
     if (!unit) return false;
     let name = (unit.name || '').toLowerCase();
     return name.includes('artillery') || name.includes('ship') || name.includes('boat') || getUnitPower(unit) === 0;
 }
 
+// Checks if two units are immediately adjacent to each other horizontally, vertically, or diagonally (Chebyshev distance <= 1)
 function areUnitsConnected(u1, u2) {
-    let dx = Math.abs(u1.gridX - u2.gridX);
-    let dy = Math.abs(u1.gridY - u2.gridY);
-    return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
+    let dx = Math.abs(u1.gridX - u2.gridX); // Horizontal coordinate distance difference
+    let dy = Math.abs(u1.gridY - u2.gridY); // Vertical coordinate distance difference
+    return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0); // True if touching within 1 tile and not the exact same tile
 }
 
+// Groups team units into connected "superunits", accounting for direct bonds and proxy enemy-bridge connections
 function getSuperunitsForTeam(teamName, allUnits) {
-    let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u));
-    let enemyUnits = allUnits.filter(u => getTeamFromUnit(u) !== teamName && !isSpecialUnit(u));
-    let visited = new Set();
-    let superunits = [];
+    let teamUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && !isSpecialUnit(u)); // Filters regular combat units for the team
+    let enemyUnits = allUnits.filter(u => getTeamFromUnit(u) !== teamName && !isSpecialUnit(u)); // Filters enemy combat units for proxy checks
+    let visited = new Set(); // Tracks processed units to prevent infinite loops during traversal
+    let superunits = []; // Collection array to store assembled superunit groups
 
     teamUnits.forEach(unit => {
-        if (visited.has(unit)) return;
+        if (visited.has(unit)) return; // Skip if unit is already part of a processed cluster
 
-        let group = [];
-        let queue = [unit];
+        let group = []; // Units belonging to this specific superunit cluster
+        let queue = [unit]; // Traversal queue
         visited.add(unit);
 
         while (queue.length > 0) {
             let curr = queue.shift();
             group.push(curr);
 
+            // 1. Direct friendly connections check
             teamUnits.forEach(other => {
                 if (!visited.has(other) && areUnitsConnected(curr, other)) {
                     visited.add(other);
-                    queue.push(other);
+                    queue.push(other); // Adds directly touching friendly unit to cluster
                 }
             });
 
+            // 2. Proxy Bridge Connections through adjacent enemy units check
             teamUnits.forEach(other => {
                 if (!visited.has(other)) {
                     let bridgedByEnemy = enemyUnits.some(eUnit => areUnitsConnected(curr, eUnit) && areUnitsConnected(other, eUnit));
                     if (bridgedByEnemy) {
                         visited.add(other);
-                        queue.push(other);
+                        queue.push(other); // Adds friendly unit separated by an enemy bridge to cluster
                     }
                 }
             });
         }
 
-        let totalPower = group.reduce((sum, u) => sum + getUnitPower(u), 0);
+        let totalPower = group.reduce((sum, u) => sum + getUnitPower(u), 0); // Sums total combined power of all units in cluster
         superunits.push({ units: group, power: totalPower });
     });
 
+    // Treats individual special units (artillery/ships) as standalone superunit entities
     let specialUnits = allUnits.filter(u => getTeamFromUnit(u) === teamName && isSpecialUnit(u));
     specialUnits.forEach(su => {
         superunits.push({ units: [su], power: getUnitPower(su) });
@@ -137,6 +145,7 @@ function getSuperunitsForTeam(teamName, allUnits) {
     return superunits;
 }
 
+// Checks if a specific unit is currently locked in an equal-power frontline stalemate with an enemy superunit
 function isUnitLockedInStalemate(unit) {
     let team = getTeamFromUnit(unit);
     let opposingTeam = team === 'blue' ? 'red' : 'blue';
@@ -149,7 +158,7 @@ function isUnitLockedInStalemate(unit) {
             opposingSupers.forEach(oSu => {
                 let touching = oSu.units.some(ou => su.units.some(u => areUnitsConnected(u, ou) || (u.gridX === ou.gridX && u.gridY === ou.gridY)));
                 if (touching && su.power === oSu.power) {
-                    isLocked = true;
+                    isLocked = true; // True if touching an enemy superunit of exact matching power level
                 }
             });
         }
@@ -157,6 +166,7 @@ function isUnitLockedInStalemate(unit) {
     return isLocked;
 }
 
+// Queues a list of defeated units into the disintegration animation pipeline
 function queueForDisintegration(unitList) {
     let now = performance.now();
     unitList.forEach(u => {
@@ -164,12 +174,13 @@ function queueForDisintegration(unitList) {
             destroyedUnitsQueue.push({
                 unit: u,
                 startTime: now,
-                duration: 1800 
+                duration: 1800 // Animation duration in milliseconds before complete removal
             });
         }
     });
 }
 
+// Compares opposing superunits on the board, resolving combat outcomes and triggering destruction queues
 function resolveUnitInteractions() {
     let blueSupers = getSuperunitsForTeam('blue', units);
     let redSupers = getSuperunitsForTeam('red', units);
@@ -182,26 +193,29 @@ function resolveUnitInteractions() {
 
             if (isTouching) {
                 if (bSu.power > rSu.power) {
-                    queueForDisintegration(rSu.units);
+                    queueForDisintegration(rSu.units); // Blue stronger: destroys red superunit
                 } else if (rSu.power > bSu.power) {
-                    queueForDisintegration(bSu.units);
+                    queueForDisintegration(bSu.units); // Red stronger: destroys blue superunit
                 }
             }
         });
     });
 
+    // Cleans up units whose disintegration animation duration has fully elapsed
     let now = performance.now();
     let fullyDestroyed = destroyedUnitsQueue.filter(item => (now - item.startTime) >= item.duration).map(item => item.unit);
     if (fullyDestroyed.length > 0) {
-        units = units.filter(u => !fullyDestroyed.includes(u));
+        units = units.filter(u => !fullyDestroyed.includes(u)); // Removes destroyed units from active unit array
         destroyedUnitsQueue = destroyedUnitsQueue.filter(item => (now - item.startTime) < item.duration);
     }
 }
 
+// Checks if target grid coordinates land exactly on a Gold Core's center tile
 function isGoldCoreCenter(c, r) {
     return goldCores.some(core => core.c === c && core.r === r);
 }
 
+// Checks and processes gold core capture events when a unit steps into a valid capture zone
 function checkAndCaptureGold(unit, c, r) {
     let team = getTeamFromUnit(unit);
     goldCores.forEach(core => {
@@ -213,35 +227,37 @@ function checkAndCaptureGold(unit, c, r) {
         let matches = inDefinedZone || (isLocalAdjacent && core.id !== 'gc5' && core.id !== 'gc6');
         
         if (matches && core.owner !== team) {
-            core.owner = team;
-            flagAnimations[core.id] = { startTime: performance.now(), team: team };
+            core.owner = team; // Updates gold core ownership to capturing team
+            flagAnimations[core.id] = { startTime: performance.now(), team: team }; // Triggers drop animation
 
             if (team === 'blue') {
-                blueCoins += 1;
+                blueCoins += 1; // Increments blue team coin score
             } else {
-                redCoins += 1;
+                redCoins += 1; // Increments red team coin score
             }
         }
     });
 }
 
+// Validates and processes a unit movement attempt, enforcing turn orders, stalemate locks, and capture checks
 function tryMoveUnit(unit, newC, newR) {
     let unitTeam = getTeamFromUnit(unit);
-    if (unitTeam !== currentTurn) return false; 
-    if (isGoldCoreCenter(newC, newR)) return false; 
+    if (unitTeam !== currentTurn) return false; // Blocks movement if it is not that team's active turn
+    if (isGoldCoreCenter(newC, newR)) return false; // Prohibits moving units directly onto gold core centers
 
+    // Prohibits movement if the unit is currently locked in an equal power stalemate
     if (isUnitLockedInStalemate(unit)) {
         console.log(`🔒 STALEMATE LOCK: Unit cannot be moved while locked in equal power stalemate!`);
         return false;
     }
 
-    unit.gridX = newC;
-    unit.gridY = newR;
+    unit.gridX = newC; // Updates unit column coordinate
+    unit.gridY = newR; // Updates unit row coordinate
 
-    checkAndCaptureGold(unit, newC, newR);
-    resolveUnitInteractions();
+    checkAndCaptureGold(unit, newC, newR); // Checks if move results in gold core capture
+    resolveUnitInteractions(); // Resolves combat interactions after movement
 
-    currentTurn = (currentTurn === 'blue') ? 'red' : 'blue';
+    currentTurn = (currentTurn === 'blue') ? 'red' : 'blue'; // Switches active turn to opposing team
     return true;
 }
 
@@ -251,9 +267,9 @@ function tryMoveUnit(unit, newC, newR) {
 function drawTeamUIAndFlags() {
     let currentTime = performance.now();
 
-    resolveUnitInteractions();
+    resolveUnitInteractions(); // Continuously resolves ongoing combat rules during render frame
 
-    // 1. Disintegration Overlay
+    // 1. Disintegration Overlay: Renders gradual grid-cell patch fading effect for defeated units
     destroyedUnitsQueue.forEach(item => {
         let elapsed = currentTime - item.startTime;
         let progress = Math.min(1, elapsed / item.duration);
@@ -279,7 +295,7 @@ function drawTeamUIAndFlags() {
         ctx.restore();
     });
 
-    // 2. Render Gold Core Flags
+    // 2. Render Gold Core Flags: Draws captured team flags over gold core tiles with drop animation
     goldCores.forEach(core => {
         if (!core.owner) return;
         let px = core.c * cellSize;
@@ -297,7 +313,7 @@ function drawTeamUIAndFlags() {
             if (elapsed < duration) {
                 let progress = elapsed / duration;
                 let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
-                renderY = targetY - (cellSize * 1.5) + dropOffset;
+                renderY = targetY - (cellSize * 1.5) + dropOffset; // Cosine easing drop offset calculation
             }
         }
 
@@ -310,8 +326,8 @@ function drawTeamUIAndFlags() {
     });
 
     // 3. Render Power Badges with Significant Inward Offset (Towards Map Center)
-    let mapCenterX = (ctx.canvas.width / 2);
-    let mapCenterY = (ctx.canvas.height / 2);
+    let mapCenterX = (ctx.canvas.width / 2); // Calculates absolute horizontal center pixel coordinate of the canvas map
+    let mapCenterY = (ctx.canvas.height / 2); // Calculates absolute vertical center pixel coordinate of the canvas map
 
     ['blue', 'red'].forEach(team => {
         let superunits = getSuperunitsForTeam(team, units);
@@ -329,27 +345,28 @@ function drawTeamUIAndFlags() {
                 });
             });
 
+            // Calculates average pixel location center of all units inside the superunit group
             let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
             let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
 
-            let labelText = su.units.length > 1 ? `${su.power}` : '';
-            if (isLocked) labelText += ' 🔒';
+            let labelText = su.units.length > 1 ? `${su.power}` : ''; // Only displays power badge if superunit has multiple units combined
+            if (isLocked) labelText += ' 🔒'; // Appends lock symbol text if group is stalemated
 
             if (labelText.trim() !== '') {
-                // Calculate direction vector pointing from unit cluster towards the map center
+                // Calculates directional vector pointing from the superunit cluster towards the map center
                 let dirX = mapCenterX - (avgX + cellSize / 2);
                 let dirY = mapCenterY - (avgY + cellSize / 2);
-                let length = Math.sqrt(dirX * dirX + dirY * dirY);
+                let length = Math.sqrt(dirX * dirX + dirY * dirY); // Euclidean magnitude length calculation
                 
                 let offsetX = 0;
                 let offsetY = 0;
-                let significantDistance = cellSize * 1.8; // Significant safe distance away from units
+                let significantDistance = cellSize * 1.8; // Safe pixel distance offset multiplier away from unit cluster
 
                 if (length > 0) {
-                    offsetX = (dirX / length) * significantDistance;
-                    offsetY = (dirY / length) * significantDistance;
+                    offsetX = (dirX / length) * significantDistance; // Normalizes and scales horizontal offset vector
+                    offsetY = (dirY / length) * significantDistance; // Normalizes and scales vertical offset vector
                 } else {
-                    offsetY = -significantDistance; // Fallback default upward offset if dead center
+                    offsetY = -significantDistance; // Fallback default upward offset if cluster sits dead-center
                 }
 
                 let tagCenterX = avgX + (cellSize / 2) + offsetX;
@@ -365,37 +382,37 @@ function drawTeamUIAndFlags() {
                 let tagX = tagCenterX - (tagWidth / 2);
                 let tagY = tagCenterY - (tagHeight / 2);
 
-                ctx.fillStyle = '#cc0000';
-                ctx.strokeStyle = '#ffffff';
+                ctx.fillStyle = '#cc0000'; // Red badge pill background fill color
+                ctx.strokeStyle = '#ffffff'; // White border outline color
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
-                ctx.roundRect(tagX, tagY, tagWidth, tagHeight, 6);
+                ctx.roundRect(tagX, tagY, tagWidth, tagHeight, 6); // Draws rounded rectangle pill shape
                 ctx.fill();
                 ctx.stroke();
 
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = '#ffffff'; // White text fill color
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(labelText, tagCenterX, tagCenterY);
+                ctx.fillText(labelText, tagCenterX, tagCenterY); // Renders power/lock text label on badge
                 ctx.restore();
             }
         });
     });
 
-    // 4. Draw HUD Box
+    // 4. Draw HUD Box: Renders on-screen game status interface panel showing turn and coin counts
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; // Semi-transparent dark box background
     ctx.fillRect(10, 10, 210, 60);
-    ctx.strokeStyle = currentTurn === 'blue' ? '#3498db' : '#e74c3c';
+    ctx.strokeStyle = currentTurn === 'blue' ? '#3498db' : '#e74c3c'; // Border color matches active team color
     ctx.lineWidth = 2;
     ctx.strokeRect(10, 10, 210, 60);
 
     ctx.font = 'bold 13px sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Turn: ${currentTurn.toUpperCase()}`, 20, 30);
+    ctx.fillText(`Turn: ${currentTurn.toUpperCase()}`, 20, 30); // Displays active turn indicator text
     ctx.fillStyle = '#3498db';
-    ctx.fillText(`Blue Coins: ${blueCoins}`, 20, 48);
+    ctx.fillText(`Blue Coins: ${blueCoins}`, 20, 48); // Displays blue team captured gold score
     ctx.fillStyle = '#e74c3c';
-    ctx.fillText(`Red Coins: ${redCoins}`, 120, 48);
+    ctx.fillText(`Red Coins: ${redCoins}`, 120, 48); // Displays red team captured gold score
     ctx.restore();
 }
