@@ -156,7 +156,7 @@ canvas.addEventListener('pointerdown', (e) => {
                 legalMoves = getLegalMoves(clickedUnit);
                 targetTile = null; 
                 rangeMode = false; 
-            }, 500); 
+            }, 5); 
         } else {
             if (selectedUnit && ((selectedUnit.name || '').includes('Ship') || (selectedUnit.name || '').includes('Artillery'))) {
                 let btnX = selectedUnit.renderX + cellSize + 12;
