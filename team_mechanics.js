@@ -278,28 +278,35 @@ function tryMoveUnit(unit, newC, newR) {
 
         if (inZone) {
             let defendingTeam = core.owner;
-            if (defendingTeam && defendingTeam !== movingTeam) {
-                let defenderSu = getSuperunitsForTeam(defendingTeam, units).find(su => su.core === core || su.units.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY)));
-                let defenderPower = defenderSu ? defenderSu.power : 0;
+            
+            // Only trigger capture logic if the core is neutral or owned by the enemy
+            if (defendingTeam !== movingTeam) {
+                if (defendingTeam && defendingTeam !== movingTeam) {
+                    let defenderSu = getSuperunitsForTeam(defendingTeam, units).find(su => su.core === core || su.units.some(u => core.captureZones.some(z => z.c === u.gridX && z.r === u.gridY)));
+                    let defenderPower = defenderSu ? defenderSu.power : 0;
 
-                if (movingPower > defenderPower) {
+                    if (movingPower > defenderPower) {
+                        core.owner = movingTeam;
+                        if (movingTeam === 'blue') blueCoins++;
+                        else redCoins++;
+                        flagAnimations[core.id] = performance.now();
+                        TeamLog.success(`${movingTeam.toUpperCase()} captured enemy/neutral Gold Core ${core.id}!`);
+                    } else {
+                        let directlyConnectedToDefenderUnits = units.some(defU => getTeamFromUnit(defU) === defendingTeam && areUnitsAdjacent(unit, defU));
+                        if (directlyConnectedToDefenderUnits) {
+                            unitsToDestroy.add(unit);
+                            TeamLog.warn(`${movingTeam.toUpperCase()} unit failed to capture core ${core.id} and was destroyed due to direct unit contact.`);
+                        } else {
+                            TeamLog.info(`${movingTeam.toUpperCase()} unit failed to capture core ${core.id} but survived safely.`);
+                        }
+                    }
+                } else if (!defendingTeam) {
                     core.owner = movingTeam;
                     if (movingTeam === 'blue') blueCoins++;
                     else redCoins++;
                     flagAnimations[core.id] = performance.now();
-                } else {
-                    let directlyConnectedToDefenderUnits = units.some(defU => getTeamFromUnit(defU) === defendingTeam && areUnitsAdjacent(unit, defU));
-                    if (directlyConnectedToDefenderUnits) {
-                        unitsToDestroy.add(unit); // Only destroyed if directly connected to core defending units
-                    }
+                    TeamLog.success(`${movingTeam.toUpperCase()} claimed neutral Gold Core ${core.id}!`);
                 }
-            } else if (!defendingTeam) {
-                core.owner = movingTeam;
-                if (movingTeam === 'blue') blueCoins++;
-                else redCoins++;
-                flagAnimations[core.id] = performance.now();
-            } else {
-                flagAnimations[core.id] = performance.now();
             }
         }
     });
