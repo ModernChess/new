@@ -176,7 +176,7 @@
             <button class="menu-btn" onclick="navigateTo('manual-main-screen')">How to Play</button>
             <button class="menu-btn" onclick="navigateTo('files-manager-screen')">Files Manager</button>
             <button class="menu-btn" onclick="navigateTo('settings-screen')">Settings</button>
-            <div class="version-badge">v1.296</div>
+            <div class="version-badge">v1.299</div>
         </div>
     </div>
 
@@ -207,17 +207,38 @@
 
     <!-- Screen Navigation Controller Script -->
     <script>
+        console.log("[INFO][index_html] DOM content fully parsed, initializing UI navigation controller.");
+
         function navigateTo(screenId) {
+            console.log(`[INFO][index_html] Attempting navigation to screen: '${screenId}'`);
+            
+            const targetScreen = document.getElementById(screenId);
+            if (!targetScreen) {
+                console.error(`[ERROR][index_html] Navigation failed: Screen element with ID '${screenId}' does not exist.`);
+                return;
+            }
+
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
             });
-            document.getElementById(screenId).classList.add('active');
+
+            targetScreen.classList.add('active');
+            console.log(`[SUCCESS][index_html] Successfully navigated to screen: '${screenId}'`);
         }
+
+        // Global window error listener for robust client-side error tracing and chat box parsing
+        window.addEventListener('error', function(event) {
+            console.error(`[ERROR][global_window] Uncaught error detected: ${event.message} at ${event.filename}:${event.lineno}`);
+        });
+
+        window.addEventListener('load', () => {
+            console.log("[SUCCESS][index_html] Window fully loaded, all assets and styles initialized.");
+        });
     </script>
     
     <!-- REQUIRED SCRIPT LOAD ORDER -->
-    <script src="map_setup.js"></script>
-    <script src="team_mechanics.js"></script>
-    <script src="unit_movement.js"></script>
+    <script src="map_setup.js" onerror="console.error('[ERROR][index_html] Failed to load script: map_setup.js');"></script>
+    <script src="team_mechanics.js" onerror="console.error('[ERROR][index_html] Failed to load script: team_mechanics.js');"></script>
+    <script src="unit_movement.js" onerror="console.error('[ERROR][index_html] Failed to load script: unit_movement.js');"></script>
 </body>
 </html>
