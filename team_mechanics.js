@@ -325,11 +325,45 @@ function resolveArtilleryDuel(defenderGuess) {
 
 function showArtilleryCardModal(phase) {
     let modal = document.getElementById('artillery-card-modal');
+    let title = document.getElementById('duel-modal-title');
+    let desc = document.getElementById('duel-modal-desc');
+    let btnContainer = document.getElementById('duel-button-container');
+
     if (!modal) {
-        TeamLog.info(`[UI Modal Phase: ${phase}] Waiting for user card selection input...`);
+        TeamLog.info(`[UI Modal Phase: ${phase}] Modal element 'artillery-card-modal' not found in DOM.`);
         return;
     }
+
+    // Force modal display block immediately for local gameplay
     modal.style.display = 'block';
+
+    if (phase === 'attacker') {
+        if (title) {
+            title.innerText = `${artilleryDuelState.attackerTeam.toUpperCase()} ARTILLERY ATTACK`;
+        }
+        if (desc) {
+            desc.innerText = `${artilleryDuelState.attackerTeam.toUpperCase()} player: Choose a secret card color (Green or Red).`;
+        }
+        if (btnContainer) {
+            btnContainer.innerHTML = `
+                <button class="duel-card-btn green" onclick="attackerChooseCard('green')">Green Card</button>
+                <button class="duel-card-btn red" onclick="attackerChooseCard('red')">Red Card</button>
+            `;
+        }
+    } else if (phase === 'defender') {
+        if (title) {
+            title.innerText = `${artilleryDuelState.defenderTeam.toUpperCase()} DEFENSE RESPONSE`;
+        }
+        if (desc) {
+            desc.innerText = `${artilleryDuelState.defenderTeam.toUpperCase()} player: Guess the attacker's card color to deflect the strike!`;
+        }
+        if (btnContainer) {
+            btnContainer.innerHTML = `
+                <button class="duel-card-btn green" onclick="resolveArtilleryDuel('green')">Guess Green</button>
+                <button class="duel-card-btn red" onclick="resolveArtilleryDuel('red')">Guess Red</button>
+            `;
+        }
+    }
 }
 
 function hideArtilleryCardModal() {
