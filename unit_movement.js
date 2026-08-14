@@ -127,6 +127,28 @@ canvas.addEventListener('pointerdown', (e) => {
 
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
+            
+            // If we are in rangeMode and selected an enemy unit with an Artillery piece, trigger the card duel!
+            if (selectedUnit && rangeMode && (selectedUnit.name || '').includes('Artillery')) {
+                let attackerTeam = getTeamFromUnit(selectedUnit);
+                if (unitTeam !== attackerTeam) {
+                    let combatRanges = getUnitCombatRange(selectedUnit);
+                    let inRange = combatRanges.some(rangeBox => 
+                        clickedUnit.gridX >= rangeBox.startC && clickedUnit.gridX <= rangeBox.endC &&
+                        clickedUnit.gridY >= rangeBox.startR && clickedUnit.gridY <= rangeBox.endR
+                    );
+
+                    if (inRange) {
+                        SystemLog.info('Artillery target acquired within range. Triggering card duel.');
+                        triggerArtilleryDuel(selectedUnit, clickedUnit);
+                        selectedUnit = null;
+                        rangeMode = false;
+                        rangeSquares = [];
+                        return;
+                    }
+                }
+            }
+
             if (unitTeam !== currentTurn) return; 
 
             pressTimer = setTimeout(() => {
@@ -255,5 +277,5 @@ function update() {
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller updated successfully.');
+SystemLog.info('Unit movement controller updated successfully with Artillery Card Duel hooks.');
 update();
