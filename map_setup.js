@@ -176,7 +176,7 @@ function getTerrain(c, r) {
     if (goldCoresList.includes(coord)) return 'gold_core';
 
     const goldList = [
-        'F4', 'G4', 'H4', 'A5', 'B5', 'C5', 'F5', 'H5', 'A6', 'C6', 'F6', 'G6', 'H6', 
+        'F4', 'G4', 'H4', 'A5', 'B5', 'C5', 'F4', 'F5', 'H5', 'A6', 'C6', 'F6', 'G6', 'H6', 
         'A7', 'B7', 'C7', 'L7', 'M7', 'N7', 'L8', 'N8', 'M9', 'N9', 'P12', 'Q12', 'R12', 
         'P13', 'R13', 'E14', 'F14', 'G14', 'P14', 'Q14', 'R14', 'E15', 'G15', 'E16', 'F16', 
         'G16', 'K16', 'L16', 'M16', 'K17', 'M17', 'K18', 'L18', 'M18'
@@ -250,4 +250,102 @@ function spawnTeam(team) {
 spawnTeam('blue');
 spawnTeam('red');
 
-console.log("[SUCCESS][map_setup] Map setup script loaded and execution initialized.");
+// =========================================================================
+// ARTILLERY CARD DUEL GAME LOGIC CONTROLLER
+// =========================================================================
+
+let activeArtilleryDuel = null;
+
+function triggerArtilleryDuel(attackerUnit, targetUnit) {
+    console.log(`[INFO][map_setup] Artillery duel initiated between attacker (${attackerUnit.team}) and target.`);
+    
+    activeArtilleryDuel = {
+        attacker: attackerUnit,
+        target: targetUnit,
+        step: 'attacker_choice', // 'attacker_choice', 'defender_guess'
+        chosenColor: null
+    };
+
+    let modal = document.getElementById('artillery-card-modal');
+    let title = document.getElementById('duel-modal-title');
+    let desc = document.getElementById('duel-modal-desc');
+    let btnContainer = document.getElementById('duel-button-container');
+
+    if (modal && title && desc && btnContainer) {
+        title.innerText = `${attackerUnit.team.toUpperCase()} Artillery Attack`;
+        desc.innerText = `${attackerUnit.team.toUpperCase()} player: Choose a secret card color (Green or Red).`;
+        
+        btnContainer.innerHTML = `
+            <button class="duel-card-btn green" onclick="attackerChooseCard('green')">Green Card</button>
+            <button class="duel-card-btn red" onclick="attackerChooseCard('red')">Red Card</button>
+        `;
+        
+        modal.style.display = 'block';
+    }
+}
+
+function attackerChooseCard(color) {
+    if (!activeArtilleryDuel) return;
+    activeArtilleryDuel.chosenColor = color;
+    activeArtilleryDuel.step = 'defender_guess';
+
+    console.log(`[INFO][map_setup] Attacker selected card color: ${color}. Awaiting defender guess.`);
+
+    let title = document.getElementById('duel-modal-title');
+    let desc = document.getElementById('duel-modal-desc');
+    let btnContainer = document.getElementById('duel-button-container');
+
+    let defenderTeam = activeArtilleryDuel.attacker.team === 'blue' ? 'red' : 'blue';
+
+    if (title && desc && btnContainer) {
+        title.innerText = `${defenderTeam.toUpperCase()} Defense Response`;
+        desc.innerText = `${defenderTeam.toUpperCase()} player: Guess the attacker's card color to deflect or absorb the strike!`;
+        
+        btnContainer.innerHTML = `
+            <button class="duel-card-btn green" onclick="defenderGuessCard('green')">Guess Green</button>
+            <button class="duel-card-btn red" onclick="defenderGuessCard('red')">Guess Red</button>
+        `;
+    }
+}
+
+function defenderGuessCard(guessColor) {
+    if (!activeArtilleryDuel) return;
+
+    let modal = document.getElementById('artillery-card-modal');
+    let title = document.getElementById('duel-modal-title');
+    let desc = document.getElementById('duel-modal-desc');
+    let btnContainer = document.getElementById('duel-button-container');
+
+    let attackerColor = activeArtilleryDuel.chosenColor;
+    let targetUnit = activeArtilleryDuel.target;
+    let success = (guessColor === attackerColor);
+
+    console.log(`[INFO][map_setup] Defender guessed ${guessColor}. Attacker had ${attackerColor}. Match result: ${success ? 'SUCCESS (Deflected)' : 'FAILED (Destroyed)'}`);
+
+    if (title && desc && btnContainer) {
+        if (success) {
+            title.innerText = "Duel Deflected!";
+            desc.innerText = `Correct guess! The target successfully deflected the artillery strike and takes no damage.`;
+        } else {
+            title.innerText = "Strike Direct Hit!";
+            desc.innerText = `Incorrect guess! The artillery strike hits dead-on and destroys the target unit.`;
+            // Remove the targeted unit from the active units array
+            units = units.filter(u => u !== targetUnit);
+        }
+
+        btnContainer.innerHTML = `
+            <button class="duel-card-btn green" onclick="closeArtilleryModal()">Close Duel</button>
+        `;
+    }
+}
+
+function closeArtilleryModal() {
+    let modal = document.getElementById('artillery-card-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    activeArtilleryDuel = null;
+    console.log("[INFO][map_setup] Artillery card duel modal closed, game state restored.");
+}
+
+console.log("[SUCCESS][map_setup] Map setup script with integrated Artillery Card Duel logic loaded and execution initialized.");
