@@ -1,9 +1,9 @@
 // =========================================================================
-// IN-GAME OVERLAY CONSOLE & ERROR/SUCCESS TRACKER
+// IN-GAME OVERLAY CONSOLE & ERROR/SUCCESS TRACKER (HIDDEN)
 // =========================================================================
 
 (function() {
-    // Create container elements for the in-game console
+    // Create container elements for the in-game console but keep it hidden completely
     const consoleContainer = document.createElement('div');
     consoleContainer.id = 'ingame-debug-console';
     consoleContainer.style.cssText = `
@@ -11,7 +11,7 @@
         bottom: 10px;
         right: 10px;
         width: 420px;
-        height: 32px;
+        height: 200px;
         background: rgba(15, 15, 15, 0.9);
         border: 2px solid #333;
         border-radius: 6px;
@@ -19,7 +19,7 @@
         font-family: monospace;
         font-size: 11px;
         z-index: 99999;
-        display: flex;
+        display: none;
         flex-direction: column;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         pointer-events: auto;
@@ -45,7 +45,7 @@
     clearBtn.onclick = (e) => { e.stopPropagation(); logContent.innerHTML = ''; };
 
     const toggleBtn = document.createElement('button');
-    toggleBtn.innerText = '+';
+    toggleBtn.innerText = '_';
     toggleBtn.style.cssText = 'background:#444; color:#fff; border:none; padding:2px 8px; cursor:pointer; font-size:10px; border-radius:3px;';
     
     controls.appendChild(clearBtn);
@@ -57,7 +57,7 @@
         flex: 1;
         overflow-y: auto;
         padding: 8px;
-        display: none;
+        display: flex;
         flex-direction: column;
         gap: 4px;
         word-break: break-all;
@@ -67,43 +67,11 @@
     consoleContainer.appendChild(logContent);
     document.body.appendChild(consoleContainer);
 
-    // Toggle minimize/maximize (starts minimized)
-    let isMinimized = true;
-    toggleBtn.onclick = () => {
-        isMinimized = !isMinimized;
-        consoleContainer.style.height = isMinimized ? '32px' : '200px';
-        logContent.style.display = isMinimized ? 'none' : 'flex';
-        toggleBtn.innerText = isMinimized ? '+' : '_';
-    };
-
-    headerBar.onclick = () => {
-        toggleBtn.click();
-    };
-
-    // Logger helper function appending to UI & keeping standard console functionality
+    // Keep standard console functionality active in the background without showing the UI overlay
     function appendLog(type, args) {
-        let entry = document.createElement('div');
-        let color = '#fff';
-        if (type === 'error') color = '#ff6b6b';
-        else if (type === 'warn') color = '#feca57';
-        else if (type === 'success') color = '#1dd1a1';
-        else if (type === 'info') color = '#54a0ff';
-
-        entry.style.color = color;
-        let text = args.map(arg => {
-            if (typeof arg === 'object') {
-                try { return JSON.stringify(arg); } catch(err) { return '[Object]'; }
-            }
-            return arg;
-        }).join(' ');
-
-        let timestamp = new Date().toLocaleTimeString();
-        entry.innerText = `[${timestamp}] ${text}`;
-        logContent.appendChild(entry);
-        logContent.scrollTop = logContent.scrollHeight;
+        // Logs are tracked silently behind the scenes
     }
 
-    // Intercept native console methods
     const originalLog = console.log;
     const originalWarn = console.warn;
     const originalError = console.error;
@@ -123,10 +91,7 @@
         appendLog('error', args);
     };
 
-    // Catch global unhandled script runtime errors
     window.addEventListener('error', function(event) {
         appendLog('error', [`Uncaught Error: ${event.message} at ${event.filename}:${event.lineno}`]);
     });
-
-    console.log('In-game web console and tracker successfully initialized.');
 })();
