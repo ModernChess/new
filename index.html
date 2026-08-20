@@ -318,7 +318,7 @@
             <button class="menu-btn disabled" onclick="event.preventDefault();">How to Play</button>
             <button class="menu-btn disabled" onclick="event.preventDefault();">Files Manager</button>
             <button class="menu-btn disabled" onclick="event.preventDefault();">Settings</button>
-            <div class="version-badge">v1.377 (update2)</div>
+            <div class="version-badge">v1.377 (update2-largerboard)</div>
         </div>
     </div>
 
@@ -329,19 +329,10 @@
             <h2 class="screen-title">Select Board</h2>
         </div>
         <div class="screen-body">
-            <!-- 1. Default Basic Board Card -->
-            <div class="board-option-card default-board" id="card-basic-board">
+            <!-- Larger Basic Board Card (Sole Board Option) -->
+            <div class="board-option-card default-board" id="card-larger-board">
                 <div class="board-info">
-                    <h3 style="margin:0;">Basic Board (Default)</h3>
-                    <small style="color: var(--text-muted);">18x18 Grid Map (9x9 Macro)</small>
-                </div>
-                <button class="confirm-btn" onclick="selectAndStartBoard('basic')">Confirm</button>
-            </div>
-
-            <!-- 2. Larger Basic Board Card -->
-            <div class="board-option-card" id="card-larger-board">
-                <div class="board-info">
-                    <h3 style="margin:0;">Larger Basic Board</h3>
+                    <h3 style="margin:0;">Larger Board (Default)</h3>
                     <small style="color: var(--text-muted);">24x34 Grid Map (12x17 Macro)</small>
                 </div>
                 <button class="confirm-btn" onclick="selectAndStartBoard('larger_basic')">Confirm</button>
@@ -396,17 +387,9 @@
     <script>
         console.log("[INFO][index_html] DOM content fully parsed, initializing UI navigation controller.");
 
-        // Board Configurations Dictionary
-        window.selectedBoardType = 'basic';
+        // Board Configurations Dictionary (Streamlined for Larger Board Only)
+        window.selectedBoardType = 'larger_basic';
         window.BOARD_CONFIGS = {
-            basic: {
-                type: 'basic',
-                cols: 18,
-                rows: 18,
-                macroCols: 9,
-                macroRows: 9,
-                tileSize: 30
-            },
             larger_basic: {
                 type: 'larger_basic',
                 cols: 24,
@@ -420,7 +403,7 @@
         // Select Board Type and Launch Game Engine
         function selectAndStartBoard(boardType) {
             window.selectedBoardType = boardType;
-            const config = window.BOARD_CONFIGS[boardType] || window.BOARD_CONFIGS.basic;
+            const config = window.BOARD_CONFIGS[boardType] || window.BOARD_CONFIGS.larger_basic;
             window.ACTIVE_BOARD_CONFIG = config;
 
             // Resize HTML5 Canvas dimensions according to grid configuration
