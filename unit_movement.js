@@ -8,6 +8,8 @@ let targetTile = null;
 let pressTimer = null;       
 let rangeMode = false;
 let rangeSquares = [];
+let lastClickTime = 0;       // Double-click timer tracker for pendingSpawn
+let lastClickTile = null;    // Double-click tile target tracker for pendingSpawn
 
 const SystemLog = {
     info: (msg, data = null) => console.log(`[INFO][unit_movement]: ${msg}`, data ?? ''),
@@ -47,7 +49,7 @@ function getUnitCombatRange(unit) {
         {dx: 0, dy: -1}, {dx: 0, dy: 1},  
         {dx: -1, dy: 0}, {dx: 1, dy: 0},  
         {dx: -1, dy: -1}, {dx: 1, dy: -1}, 
-        {dx: -1, dy: 1}, {dx: 1, dy: 1}   
+        {dx: -1, dy: 1}, {dx: 1, dy: 1}    
     ];
 
     directions.forEach(dir => {
@@ -122,13 +124,57 @@ canvas.addEventListener('pointerdown', (e) => {
 
     if (!validateCoordinates(c, r)) return;
 
+    // Intercept pointer events while waiting for a deployment tile placement
+    if (typeof pendingSpawn !== 'undefined' && pendingSpawn !== null) {
+        let validTiles = typeof getValidDeploymentTiles === 'function' 
+            ? getValidDeploymentTiles(pendingSpawn.team, pendingSpawn.unitType) 
+            : [];
+        let isValid = validTiles.some(t => t.c === c && t.r === r);
+
+        if (isValid) {
+            let nowTime = performance.now();
+            if (lastClickTile && lastClickTile.c === c && lastClickTile.r === r && (nowTime - lastClickTime) < 400) {
+                // Double-click confirmed on valid deployment tile
+                let occupied = units.some(u => u.gridX === c && u.gridY === r);
+                if (!occupied) {
+                    let currentCellSize = typeof cellSize !== 'undefined' ? cellSize : 30;
+                    
+                    units.push({
+                        name: pendingSpawn.unitName,
+                        type: pendingSpawn.category,
+                        range: pendingSpawn.unitRange,
+                        gridX: c,
+                        gridY: r,
+                        x: c * currentCellSize,
+                        y: r * currentCellSize,
+                        img: pendingSpawn.img,
+                        loaded: pendingSpawn.loaded,
+                        team: pendingSpawn.team
+                    });
+
+                    SystemLog.success(`Successfully deployed ${pendingSpawn.unitName} for ${pendingSpawn.team.toUpperCase()} at (${c}, ${r}).`);
+                    pendingSpawn = null;
+                    lastClickTime = 0;
+                    lastClickTile = null;
+                } else {
+                    SystemLog.warn(`Deployment tile (${c}, ${r}) is already occupied.`);
+                }
+            } else {
+                lastClickTime = nowTime;
+                lastClickTile = { c: c, r: r };
+            }
+        } else {
+            SystemLog.warn(`Selected tile (${c}, ${r}) is outside valid deployment territory.`);
+        }
+        return;
+    }
+
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
 
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
             
-            // If we are in rangeMode and selected an enemy unit with an Artillery piece, trigger the card duel!
             if (selectedUnit && rangeMode && (selectedUnit.name || '').includes('Artillery')) {
                 let attackerTeam = getTeamFromUnit(selectedUnit);
                 if (unitTeam !== attackerTeam) {
@@ -206,6 +252,20 @@ function update() {
         drawTeamUIAndFlags();
     }
 
+    // Deployment Outline Overlay pass while pendingSpawn is active
+    if (typeof pendingSpawn !== 'undefined' && pendingSpawn !== null) {
+        let validTiles = typeof getValidDeploymentTiles === 'function' 
+            ? getValidDeploymentTiles(pendingSpawn.team, pendingSpawn.unitType) 
+            : [];
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 3.5;
+        validTiles.forEach(tile => {
+            let px = tile.c * cellSize;
+            let py = tile.r * cellSize;
+            ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+        });
+    }
+
     units.forEach(u => {
         let targetX = u.gridX * cellSize;
         let targetY = u.gridY * cellSize;
@@ -277,5 +337,5 @@ function update() {
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller updated successfully with Artillery Card Duel hooks.');
+SystemLog.info('Unit movement controller updated successfully with Deployment Overlays and Double-Click Handlers.');
 update();
