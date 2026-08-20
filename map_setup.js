@@ -1,5 +1,5 @@
 // =========================================================================
-// MAP SETUP & ASSET INITIALIZATION CONTROLLER
+// MAP SETUP & ASSET INITIALIZATION CONTROLLER (IN-WEB GRID SYSTEM)
 // =========================================================================
 
 // References the main canvas element from the HTML document DOM
@@ -24,7 +24,7 @@ function lerp(start, end, t) {
     return start + (end - start) * t;
 }
 
-// Base CDN raw endpoint URL string pointing to remote repository assets
+// Base CDN raw endpoint URL string pointing to remote repository assets (Map image removed)
 const ghBase = 'https://cdn.jsdelivr.net/gh/ModernChess/assets-images@main/';
 
 // Dynamic Loading Screen Overlay Element Creation
@@ -45,22 +45,19 @@ loadingOverlay.style.fontFamily = 'sans-serif';
 
 // Injects inner HTML markup elements for the loading progress indicator bar
 loadingOverlay.innerHTML = `
-    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
+    <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Unit Assets...</h3>
     <div style="width: 240px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; border: 1px solid #333;">
         <div id="progressBar" style="width: 0%; height: 100%; background: #2ecc71; transition: width 0.1s ease;"></div>
     </div>
     <span id="progressText" style="margin-top: 10px; font-size: 13px; color: #aaa;">0%</span>
 `;
-// Appends the loading overlay dynamically directly to the document body
 document.body.appendChild(loadingOverlay);
 
-// References to the progress bar and text percentage display elements
 const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
-// Array list containing all external remote asset file download links
+// Asset URLs restricted strictly to unit textures (external map image excluded)
 const assetUrls = [
-    ghBase + 'map2.png',
     ghBase + 'blue_tank.jpg',
     ghBase + 'blue_infantry.jpg',
     ghBase + 'blue_artillery.jpg',
@@ -74,9 +71,8 @@ const assetUrls = [
 let loadedCount = 0;
 const totalAssets = assetUrls.length;
 
-// Image objects and corresponding boolean loaded state trackers
-let mapImg = new Image();
-let mapLoaded = false;
+// Map image variables removed; grid is now procedurally rendered via in-web system
+let mapLoaded = true; 
 
 let blueTankImg = new Image(), blueTankLoaded = false;
 let blueInfantryImg = new Image(), blueInfantryLoaded = false;
@@ -88,7 +84,6 @@ let redInfantryImg = new Image(), redInfantryLoaded = false;
 let redArtilleryImg = new Image(), redArtilleryLoaded = false;
 let redShipImg = new Image(), redShipLoaded = false;
 
-// Updates progress bar width and text percentage as assets finish loading
 function updateLoadingProgress() {
     loadedCount++;
     let percent = Math.floor((loadedCount / totalAssets) * 100);
@@ -97,9 +92,8 @@ function updateLoadingProgress() {
 
     console.log(`[INFO][map_setup] Asset loaded progress: ${loadedCount}/${totalAssets} (${percent}%)`);
 
-    // Fades out and removes loading overlay once all assets have successfully loaded
     if (loadedCount >= totalAssets) {
-        console.log("[SUCCESS][map_setup] All game assets loaded successfully.");
+        console.log("[SUCCESS][map_setup] All unit assets loaded successfully.");
         setTimeout(() => {
             loadingOverlay.style.opacity = '0';
             loadingOverlay.style.transition = 'opacity 0.4s ease';
@@ -108,7 +102,6 @@ function updateLoadingProgress() {
     }
 }
 
-// Robust asset loader function using fetch blob caching with fallback error handling
 function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
     fetch(url)
         .then(response => {
@@ -137,29 +130,25 @@ function loadAssetWithProgress(url, imgObj, setLoadedFlag) {
         });
 }
 
-// Initiates background loading tasks for all map and unit textures
-loadAssetWithProgress(assetUrls[0], mapImg, (val) => { mapLoaded = val; });
-loadAssetWithProgress(assetUrls[1], blueTankImg, (val) => { blueTankLoaded = val; });
-loadAssetWithProgress(assetUrls[2], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
-loadAssetWithProgress(assetUrls[3], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
-loadAssetWithProgress(assetUrls[4], blueShipImg, (val) => { blueShipLoaded = val; });
-loadAssetWithProgress(assetUrls[5], redTankImg, (val) => { redTankLoaded = val; });
-loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded = val; });
-loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
-loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
+// Initiates background loading tasks for unit textures only
+loadAssetWithProgress(assetUrls[0], blueTankImg, (val) => { blueTankLoaded = val; });
+loadAssetWithProgress(assetUrls[1], blueInfantryImg, (val) => { blueInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[2], blueArtilleryImg, (val) => { blueArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[3], blueShipImg, (val) => { blueShipLoaded = val; });
+loadAssetWithProgress(assetUrls[4], redTankImg, (val) => { redTankLoaded = val; });
+loadAssetWithProgress(assetUrls[5], redInfantryImg, (val) => { redInfantryLoaded = val; });
+loadAssetWithProgress(assetUrls[6], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
+loadAssetWithProgress(assetUrls[7], redShipImg, (val) => { redShipLoaded = val; });
 
-// Converts 0-indexed column index to standard board letter notation (A, B, C... X)
 function getColName(colIndex) {
     return String.fromCharCode(65 + colIndex);
 }
 
-// Determines terrain type classification based on specific grid coordinates
 function getTerrain(c, r) {
     const colChar = getColName(c);
     const rowNum = r + 1;
     const coord = colChar + rowNum;
 
-    // Standard water terrain tiles
     const waterList = [
         'I5', 'J5', 'I6', 'J6', 'K6', 'H7', 'I7', 'J7', 'K7', 'G8', 'H8', 'I8', 'J8', 'K8', 
         'E9', 'F9', 'G9', 'H9', 'I9', 'J9', 'K9', 'L9', 'E10', 'F10', 'G10', 'H10', 'I10', 
@@ -191,15 +180,46 @@ function getTerrain(c, r) {
     return 'land';
 }
 
-// Utility check to determine if a terrain string qualifies as water
 function isWaterTerrain(terrain) {
     return terrain === 'water' || terrain === 'blue_navy' || terrain === 'red_navy';
 }
 
-// Global array holding active game units
+// Procedural In-Web Grid System Render Function
+function drawGridMap() {
+    if (!ctx) return;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            let terrain = getTerrain(c, r);
+            let fillColor = '#d5dbdb'; // Default land color
+
+            if (terrain === 'water') fillColor = '#2980b9';
+            else if (terrain === 'blue_navy') fillColor = '#1f618d';
+            else if (terrain === 'red_navy') fillColor = '#b03a2e';
+            else if (terrain === 'blue_core' || terrain === 'blue_base') fillColor = '#85c1e9';
+            else if (terrain === 'red_core' || terrain === 'red_base') fillColor = '#f5b7b1';
+            else if (terrain === 'gold_core') fillColor = '#f1c40f';
+            else if (terrain === 'gold') fillColor = '#f9e79f';
+            else if (terrain === 'land') fillColor = '#a9dfbf';
+
+            // Fill cell background
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+
+            // Draw crisp visible grid lines and coordinate labels
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(c * cellSize, r * cellSize, cellSize, cellSize);
+
+            // Optional subtle coordinate text inside tiles for debugging/clarity
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.font = '8px sans-serif';
+            ctx.fillText(getColName(c) + (r + 1), c * cellSize + 3, r * cellSize + 10);
+        }
+    }
+}
+
 let units = [];
 
-// Retrieves array of coordinates corresponding to a team's base and core structures
 function getBaseSquares(team) {
     let squares = [];
     for (let r = 0; r < rows; r++) {
@@ -212,7 +232,6 @@ function getBaseSquares(team) {
     return squares;
 }
 
-// Finds the designated navy port square for a given team
 function getPortSquare(team) {
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -225,7 +244,6 @@ function getPortSquare(team) {
     return {c: 0, r: 0};
 }
 
-// Spawns initial units: each side begins with a lone infantry unit
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
@@ -250,7 +268,6 @@ function spawnTeam(team) {
     console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with lone initial infantry at (${startPos.c}, ${startPos.r}).`);
 }
 
-// Dynamic Map Initialization Function (Called when menu option is selected)
 window.initGameMap = function(config) {
     const boardConfig = config || window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.basic;
 
@@ -270,7 +287,6 @@ window.initGameMap = function(config) {
     console.log(`[SUCCESS][map_setup] Map re-initialized for preset: '${boardConfig.type}' (${cols}x${rows} grid, cellSize: ${cellSize}px).`);
 };
 
-// Initial default setup
 window.initGameMap(window.BOARD_CONFIGS ? window.BOARD_CONFIGS.basic : { cols: 18, rows: 18 });
 
-console.log("[SUCCESS][map_setup] Map setup script loaded and execution initialized cleanly.");
+console.log("[SUCCESS][map_setup] Map setup script loaded with In-Web Grid System successfully.");
