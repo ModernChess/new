@@ -11,18 +11,22 @@ let gameOver = false;
 let winnerMessage = '';
 let pendingSpawn = null; // Intercepted shop purchase state waiting for tile placement
 
-// ALL gold cores (1 to 6) start NEUTRAL (owner: null), while gc7 and gc8 act as team base win-conditions.
+// All 12 Grid Centers and Team Base Cores mapped for the 24x34 Macro Grid Layout (AY-BV, 18-51)
 let goldCores = [
-    { id: 'gc1', c: 6, r: 4, owner: null, isBase: false, captureZones: [{c:6, r:3}, {c:6, r:5}, {c:5, r:4}, {c:7, r:4}, {c:5, r:3}, {c:5, r:5}, {c:7, r:3}, {c:7, r:5}] },
-    { id: 'gc2', c: 1, r: 5, owner: null, isBase: false, captureZones: [{c:1, r:4}, {c:1, r:6}, {c:0, r:5}, {c:2, r:5}, {c:0, r:4}, {c:0, r:6}, {c:2, r:4}, {c:2, r:6}] }, 
-    { id: 'gc3', c: 12, r: 7, owner: null, isBase: false, captureZones: [{c:12, r:6}, {c:12, r:8}, {c:11, r:7}, {c:13, r:7}, {c:11, r:6}, {c:11, r:8}, {c:13, r:6}, {c:13, r:8}] },
-    { id: 'gc4', c: 5, r: 14, owner: null, isBase: false, captureZones: [{c:5, r:13}, {c:5, r:15}, {c:4, r:14}, {c:6, r:14}, {c:4, r:13}, {c:4, r:15}, {c:6, r:13}, {c:6, r:15}] },
-    { id: 'gc5', c: 16, r: 12, owner: null, isBase: false, captureZones: [{c:16, r:11}, {c:16, r:13}, {c:15, r:12}, {c:17, r:12}, {c:15, r:11}, {c:15, r:13}, {c:17, r:11}, {c:17, r:13}] },
-    { id: 'gc6', c: 11, r: 16, owner: null, isBase: false, captureZones: [{c:11, r:15}, {c:11, r:17}, {c:10, r:16}, {c:12, r:16}, {c:10, r:15}, {c:10, r:17}, {c:12, r:15}, {c:12, r:17}] },
-    // gc7: Red Base Special Gold Core (placed at Red original base coordinate c:11, r:0 / L1)
-    { id: 'gc7', c: 11, r: 0, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:11, r:1}, {c:10, r:0}, {c:12, r:0}, {c:10, r:1}, {c:12, r:1}] },
-    // gc8: Blue Base Special Gold Core (placed at Blue original base coordinate c:0, r:11 / A12)
-    { id: 'gc8', c: 0, r: 11, owner: 'blue', isBase: true, teamBase: 'blue', captureZones: [{c:0, r:10}, {c:0, r:12}, {c:1, r:11}, {c:1, r:10}, {c:1, r:12}] }
+    { id: 'gc1', c: 3, r: 3, owner: null, isBase: false, captureZones: [{c:2, r:3}, {c:4, r:3}, {c:3, r:2}, {c:3, r:4}, {c:2, r:2}, {c:2, r:4}, {c:4, r:2}, {c:4, r:4}] },
+    { id: 'gc2', c: 11, r: 1, owner: null, isBase: false, captureZones: [{c:10, r:1}, {c:12, r:1}, {c:11, r:0}, {c:11, r:2}, {c:10, r:0}, {c:10, r:2}, {c:12, r:0}, {c:12, r:2}] }, 
+    { id: 'gc3', c: 16, r: 3, owner: null, isBase: false, captureZones: [{c:15, r:3}, {c:17, r:3}, {c:16, r:2}, {c:16, r:4}, {c:15, r:2}, {c:15, r:4}, {c:17, r:2}, {c:17, r:4}] },
+    { id: 'gc4', c: 22, r: 6, owner: null, isBase: false, captureZones: [{c:21, r:6}, {c:23, r:6}, {c:22, r:5}, {c:22, r:7}, {c:21, r:5}, {c:21, r:7}, {c:23, r:5}, {c:23, r:7}] },
+    { id: 'gc5', c: 17, r: 7, owner: null, isBase: false, captureZones: [{c:16, r:7}, {c:18, r:7}, {c:17, r:6}, {c:17, r:8}, {c:16, r:6}, {c:16, r:8}, {c:18, r:6}, {c:18, r:8}] },
+    { id: 'gc6', c: 21, r: 10, owner: null, isBase: false, captureZones: [{c:20, r:10}, {c:22, r:10}, {c:21, r:9}, {c:21, r:11}, {c:20, r:9}, {c:20, r:11}, {c:22, r:9}, {c:22, r:11}] },
+    // gc7: Red Base Special Gold Core (placed at Red command center / base region r:16, c:13)
+    { id: 'gc7', c: 13, r: 16, owner: 'red', isBase: true, teamBase: 'red', captureZones: [{c:12, r:16}, {c:14, r:16}, {c:13, r:15}, {c:13, r:17}, {c:12, r:15}, {c:12, r:17}, {c:14, r:15}, {c:14, r:17}] },
+    // gc8: Blue Base Special Gold Core (placed at Blue command center / base region r:14, c:7)
+    { id: 'gc8', c: 7, r: 14, owner: 'blue', isBase: true, teamBase: 'blue', captureZones: [{c:6, r:14}, {c:8, r:14}, {c:7, r:13}, {c:7, r:15}, {c:6, r:13}, {c:6, r:15}, {c:8, r:13}, {c:8, r:15}] },
+    { id: 'gc9', c: 17, r: 17, owner: null, isBase: false, captureZones: [{c:16, r:17}, {c:18, r:17}, {c:17, r:16}, {c:17, r:18}, {c:16, r:16}, {c:16, r:18}, {c:18, r:16}, {c:18, r:18}] },
+    { id: 'gc10', c: 12, r: 21, owner: null, isBase: false, captureZones: [{c:11, r:21}, {c:13, r:21}, {c:12, r:20}, {c:12, r:22}, {c:11, r:20}, {c:11, r:22}, {c:13, r:20}, {c:13, r:22}] },
+    { id: 'gc11', c: 6, r: 24, owner: null, isBase: false, captureZones: [{c:5, r:24}, {c:7, r:24}, {c:6, r:23}, {c:6, r:25}, {c:5, r:23}, {c:5, r:25}, {c:7, r:23}, {c:7, r:25}] },
+    { id: 'gc12', c: 2, r: 31, owner: null, isBase: false, captureZones: [{c:1, r:31}, {c:3, r:31}, {c:2, r:30}, {c:2, r:32}, {c:1, r:30}, {c:1, r:32}, {c:3, r:30}, {c:3, r:32}] }
 ];
 
 const TeamLog = {
@@ -46,7 +50,7 @@ function getTeamFromUnit(unit) {
         if (src.includes('blue')) return 'blue';
     }
 
-    let midRow = typeof rows !== 'undefined' ? rows / 2 : 9;
+    let midRow = typeof rows !== 'undefined' ? rows / 2 : 17;
     let team = unit.gridY < midRow ? 'red' : 'blue';
     unit._assignedTeam = team;
     return team;
@@ -122,7 +126,6 @@ function commitUnitDestruction(unitsArray, unitsToDestroy) {
     });
 }
 
-// Shop integration functions for purchasing units using gold coins
 function toggleShop() {
     let modal = document.getElementById('shop-modal');
     if (!modal) return;
@@ -161,7 +164,6 @@ function buyUnit(unitType) {
     if (activeTeam === 'blue') blueCoins -= cost;
     else redCoins -= cost;
 
-    // Intercept purchase: Set global pendingSpawn state instead of instant auto-spawning
     pendingSpawn = {
         unitType: unitType,
         unitName: unitName,
@@ -177,7 +179,6 @@ function buyUnit(unitType) {
     toggleShop();
 }
 
-// Territory & Core Ownership Helper Logic for Valid Deployment Tiles
 function getValidDeploymentTiles(team, unitType) {
     let validTiles = [];
 
@@ -186,7 +187,6 @@ function getValidDeploymentTiles(team, unitType) {
         let isTeamBase = (core.isBase && core.teamBase === team);
 
         if (unitType === 'infantry') {
-            // Infantry can spawn on team base tiles / base cores and captured Gold Squares linked to team-owned cores
             if (isCoreControlled || isTeamBase) {
                 if (core.captureZones) {
                     core.captureZones.forEach(zone => {
@@ -196,7 +196,6 @@ function getValidDeploymentTiles(team, unitType) {
                 validTiles.push({ c: core.c, r: core.r });
             }
         } else {
-            // Tanks, Artillery, Navy (ships/boats) spawn on regional tiles (t, art, nav) whose parent Gold Core is captured by the purchasing team
             if (isCoreControlled) {
                 if (core.captureZones) {
                     core.captureZones.forEach(zone => {
@@ -208,7 +207,6 @@ function getValidDeploymentTiles(team, unitType) {
         }
     });
 
-    // Fallback / standard base and port integration if available
     if (unitType === 'infantry' && typeof getBaseSquares === 'function') {
         let baseSquares = getBaseSquares(team);
         if (baseSquares) baseSquares.forEach(b => validTiles.push(b));
@@ -217,7 +215,6 @@ function getValidDeploymentTiles(team, unitType) {
         if (port) validTiles.push(port);
     }
 
-    // Deduplicate coordinate list
     let uniqueTiles = [];
     let seen = new Set();
     validTiles.forEach(t => {
@@ -231,7 +228,6 @@ function getValidDeploymentTiles(team, unitType) {
     return uniqueTiles;
 }
 
-// Fallback helper stubs for superunits and stalemates if external modules aren't loaded
 function getSuperunitsForTeamFallback(teamName, unitsList) {
     if (typeof window.getSuperunitsForTeam === 'function') {
         return window.getSuperunitsForTeam(teamName, unitsList);
