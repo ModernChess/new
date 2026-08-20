@@ -329,9 +329,22 @@
             <h2 class="screen-title">Select Board</h2>
         </div>
         <div class="screen-body">
-            <div class="board-option-card default-board">
-                <div class="board-info"><h3 style="margin:0;">Basic Board (Default)</h3></div>
-                <button class="confirm-btn" onclick="navigateTo('game-screen')">Confirm</button>
+            <!-- 1. Default Basic Board Card -->
+            <div class="board-option-card default-board" id="card-basic-board">
+                <div class="board-info">
+                    <h3 style="margin:0;">Basic Board (Default)</h3>
+                    <small style="color: var(--text-muted);">18x18 Grid Map (9x9 Macro)</small>
+                </div>
+                <button class="confirm-btn" onclick="selectAndStartBoard('basic')">Confirm</button>
+            </div>
+
+            <!-- 2. Larger Basic Board Card -->
+            <div class="board-option-card" id="card-larger-board">
+                <div class="board-info">
+                    <h3 style="margin:0;">Larger Basic Board</h3>
+                    <small style="color: var(--text-muted);">24x34 Grid Map (12x17 Macro)</small>
+                </div>
+                <button class="confirm-btn" onclick="selectAndStartBoard('larger_basic')">Confirm</button>
             </div>
         </div>
     </div>
@@ -382,6 +395,49 @@
     <!-- Screen Navigation Controller Script -->
     <script>
         console.log("[INFO][index_html] DOM content fully parsed, initializing UI navigation controller.");
+
+        // Board Configurations Dictionary
+        window.selectedBoardType = 'basic';
+        window.BOARD_CONFIGS = {
+            basic: {
+                type: 'basic',
+                cols: 18,
+                rows: 18,
+                macroCols: 9,
+                macroRows: 9,
+                tileSize: 30
+            },
+            larger_basic: {
+                type: 'larger_basic',
+                cols: 24,
+                rows: 34,
+                macroCols: 12,
+                macroRows: 17,
+                tileSize: 30
+            }
+        };
+
+        // Select Board Type and Launch Game Engine
+        function selectAndStartBoard(boardType) {
+            window.selectedBoardType = boardType;
+            const config = window.BOARD_CONFIGS[boardType] || window.BOARD_CONFIGS.basic;
+            window.ACTIVE_BOARD_CONFIG = config;
+
+            // Resize HTML5 Canvas dimensions according to grid configuration
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas) {
+                canvas.width = config.cols * config.tileSize;
+                canvas.height = config.rows * config.tileSize;
+            }
+
+            console.log(`[INFO][index_html] Board selected: '${boardType}' (${config.cols}x${config.rows} Grid). Initializing map...`);
+
+            if (typeof window.initGameMap === 'function') {
+                window.initGameMap(config);
+            }
+
+            navigateTo('game-screen');
+        }
 
         function navigateTo(screenId) {
             console.log(`[INFO][index_html] Attempting navigation to screen: '${screenId}'`);
