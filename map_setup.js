@@ -7,18 +7,17 @@ const canvas = document.getElementById('gameCanvas');
 if (!canvas) {
     console.error("[ERROR][map_setup] Canvas element with ID 'gameCanvas' not found in DOM.");
 }
+
 // Acquires the 2D rendering context interface for drawing graphics on the canvas
 const ctx = canvas ? canvas.getContext('2d') : null;
 if (!ctx) {
     console.error("[ERROR][map_setup] Failed to acquire 2D rendering context from canvas.");
 }
 
-// Defines the total number of grid columns on the game board map
-const cols = 18;
-// Defines the total number of grid rows on the game board map
-const rows = 18;
-// Calculates individual cell pixel dimensions relative to total canvas width
-const cellSize = canvas ? canvas.width / cols : 0;
+// Dynamic grid dimensions and tile size parameters (overwritten on initGameMap)
+let cols = 18;
+let rows = 18;
+let cellSize = canvas ? canvas.width / cols : 30;
 
 // Linear interpolation mathematical utility function for smooth movement/transitions
 function lerp(start, end, t) {
@@ -43,6 +42,7 @@ loadingOverlay.style.justifyContent = 'center';
 loadingOverlay.style.alignItems = 'center';
 loadingOverlay.style.color = '#ffffff';
 loadingOverlay.style.fontFamily = 'sans-serif';
+
 // Injects inner HTML markup elements for the loading progress indicator bar
 loadingOverlay.innerHTML = `
     <h3 style="margin-bottom: 10px; font-weight: 600; letter-spacing: 1px;">Loading Game Assets...</h3>
@@ -148,13 +148,18 @@ loadAssetWithProgress(assetUrls[6], redInfantryImg, (val) => { redInfantryLoaded
 loadAssetWithProgress(assetUrls[7], redArtilleryImg, (val) => { redArtilleryLoaded = val; });
 loadAssetWithProgress(assetUrls[8], redShipImg, (val) => { redShipLoaded = val; });
 
+// Converts 0-indexed column index to standard board letter notation (A, B, C... X)
+function getColName(colIndex) {
+    return String.fromCharCode(65 + colIndex);
+}
+
 // Determines terrain type classification based on specific grid coordinates
 function getTerrain(c, r) {
-    const colChar = String.fromCharCode(65 + c);
+    const colChar = getColName(c);
     const rowNum = r + 1;
     const coord = colChar + rowNum;
 
-    // List of map coordinates designated as water terrain tiles
+    // Standard water terrain tiles
     const waterList = [
         'I5', 'J5', 'I6', 'J6', 'K6', 'H7', 'I7', 'J7', 'K7', 'G8', 'H8', 'I8', 'J8', 'K8', 
         'E9', 'F9', 'G9', 'H9', 'I9', 'J9', 'K9', 'L9', 'E10', 'F10', 'G10', 'H10', 'I10', 
@@ -191,7 +196,7 @@ function isWaterTerrain(terrain) {
     return terrain === 'water' || terrain === 'blue_navy' || terrain === 'red_navy';
 }
 
-// Global array holding active game units - modified to start with a LONE INFANTRY per team
+// Global array holding active game units
 let units = [];
 
 // Retrieves array of coordinates corresponding to a team's base and core structures
@@ -217,19 +222,18 @@ function getPortSquare(team) {
         }
     }
     console.warn(`[WARN][map_setup] Port square not found for team '${team}'. Defaulting to (0,0).`);
-    return {c:0, r:0};
+    return {c: 0, r: 0};
 }
 
-// Spawns initial units: modified so each side begins with just a lone infantry unit instead of the full army
+// Spawns initial units: each side begins with a lone infantry unit
 function spawnTeam(team) {
     let isBlue = (team === 'blue');
     let baseSquares = getBaseSquares(team);
-    let startPos = baseSquares.length > 0 ? baseSquares[0] : {c: isBlue ? 0 : 11, r: isBlue ? 11 : 0};
+    let startPos = baseSquares.length > 0 ? baseSquares[0] : {c: isBlue ? 0 : (cols - 1), r: isBlue ? (rows - 1) : 0};
 
     let infImgRef = isBlue ? blueInfantryImg : redInfantryImg;
     let infLoadRef = () => isBlue ? blueInfantryLoaded : redInfantryLoaded;
 
-    // Game begins with a lone infantry per side
     units.push({ 
         name: 'Infantry', 
         type: 'land', 
@@ -243,11 +247,30 @@ function spawnTeam(team) {
         team: team 
     });
 
-    console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with lone initial infantry.`);
+    console.log(`[SUCCESS][map_setup] Team '${team}' successfully spawned with lone initial infantry at (${startPos.c}, ${startPos.r}).`);
 }
 
-// Triggers initial team spawning sequence for both factions
-spawnTeam('blue');
-spawnTeam('red');
+// Dynamic Map Initialization Function (Called when menu option is selected)
+window.initGameMap = function(config) {
+    const boardConfig = config || window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.basic;
+
+    cols = boardConfig.cols || 18;
+    rows = boardConfig.rows || 18;
+
+    if (canvas) {
+        cellSize = canvas.width / cols;
+    } else {
+        cellSize = boardConfig.tileSize || 30;
+    }
+
+    units = [];
+    spawnTeam('blue');
+    spawnTeam('red');
+
+    console.log(`[SUCCESS][map_setup] Map re-initialized for preset: '${boardConfig.type}' (${cols}x${rows} grid, cellSize: ${cellSize}px).`);
+};
+
+// Initial default setup
+window.initGameMap(window.BOARD_CONFIGS ? window.BOARD_CONFIGS.basic : { cols: 18, rows: 18 });
 
 console.log("[SUCCESS][map_setup] Map setup script loaded and execution initialized cleanly.");
