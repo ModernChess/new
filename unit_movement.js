@@ -241,8 +241,9 @@ canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (mapLoaded) {
-        ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
+    // Replaced mapImg with the procedural in-web grid system drawer
+    if (typeof drawGridMap === 'function') {
+        drawGridMap();
     } else {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
