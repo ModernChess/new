@@ -25,16 +25,17 @@ function validateCoordinates(c, r, maxCols = cols, maxRows = rows) {
 }
 
 function getLargerCoord(c, r) {
-    if (!validateCoordinates(c, r)) return { col: 'Al', row: '1l', colIdx: 0, rowIdx: 0 };
+    if (!validateCoordinates(c, r)) return { col: 'A', row: '1', colIdx: 0, rowIdx: 0 };
 
-    const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
-    const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
+    // Updated for the 24x34 board layout (12 macro columns, 17 macro rows)
+    const macroCols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
     let lc = Math.floor(c / 2);
     let lr = Math.floor(r / 2);
-    if (lc >= 9) lc = 8;
-    if (lr >= 9) lr = 8;
+    
+    if (lc >= macroCols.length) lc = macroCols.length - 1;
+    if (lr >= 17) lr = 16;
 
-    return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
+    return { col: macroCols[lc], row: (lr + 1).toString(), colIdx: lc, rowIdx: lr };
 }
 
 function getUnitCombatRange(unit) {
@@ -52,11 +53,14 @@ function getUnitCombatRange(unit) {
         {dx: -1, dy: 1}, {dx: 1, dy: 1}    
     ];
 
+    let maxMacroCols = Math.floor(cols / 2); // 12 for 24 cols
+    let maxMacroRows = Math.floor(rows / 2); // 17 for 34 rows
+
     directions.forEach(dir => {
         for (let step = 1; step <= maxDist; step++) {
             let nc = currentLg.colIdx + (dir.dx * step);
             let nr = currentLg.rowIdx + (dir.dy * step);
-            if (nc >= 0 && nc < 9 && nr >= 0 && nr < 9) {
+            if (nc >= 0 && nc < maxMacroCols && nr >= 0 && nr < maxMacroRows) {
                 results.push({
                     startC: nc * 2, startR: nr * 2,
                     endC: nc * 2 + 1, endR: nr * 2 + 1
@@ -241,7 +245,6 @@ canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Replaced mapImg with the procedural in-web grid system drawer
     if (typeof drawGridMap === 'function') {
         drawGridMap();
     } else {
@@ -338,5 +341,5 @@ function update() {
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller updated successfully with Deployment Overlays and Double-Click Handlers.');
+SystemLog.info('Unit movement controller updated successfully for the 24x34 larger board.');
 update();
