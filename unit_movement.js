@@ -2,8 +2,10 @@
 // UNIT MOVEMENT, INTERACTION, AND RENDERING LOOP CONTROLLER
 // =========================================================================
 
-// Declare cellSize globally with var to prevent Temporal Dead Zone (TDZ) ReferenceErrors
+// Safely declare cellSize and units globally to prevent undefined/TDZ errors
 var cellSize = (typeof window !== 'undefined' && window.cellSize) ? window.cellSize : 30;
+var units = (typeof window !== 'undefined' && window.units) ? window.units : [];
+window.units = units;
 
 let selectedUnit = null;     
 let legalMoves = [];         
