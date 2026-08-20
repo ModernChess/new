@@ -9,6 +9,7 @@ let destroyedUnitsQueue = [];
 let flagAnimations = {};
 let gameOver = false;
 let winnerMessage = '';
+let pendingSpawn = null; // Intercepted shop purchase state waiting for tile placement
 
 // ALL gold cores (1 to 6) start NEUTRAL (owner: null), while gc7 and gc8 act as team base win-conditions.
 let goldCores = [
@@ -160,56 +161,74 @@ function buyUnit(unitType) {
     if (activeTeam === 'blue') blueCoins -= cost;
     else redCoins -= cost;
 
-    let spawnPos = null;
-    if (unitCategory === 'water') {
-        spawnPos = typeof getPortSquare === 'function' ? getPortSquare(activeTeam) : {c: 0, r: 0};
-    } else {
-        let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares(activeTeam) : [{c: 0, r: 0}];
-        let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
-        if (availableBase.length > 0) {
-            spawnPos = availableBase[0];
-        } else {
-            spawnPos = baseSquares[0] || {c: 0, r: 0};
-        }
-    }
+    // Intercept purchase: Set global pendingSpawn state instead of instant auto-spawning
+    pendingSpawn = {
+        unitType: unitType,
+        unitName: unitName,
+        unitRange: unitRange,
+        category: unitCategory,
+        team: activeTeam,
+        cost: cost,
+        img: imgRef,
+        loaded: loadRef
+    };
 
-    let currentCellSize = typeof cellSize !== 'undefined' ? cellSize : 30;
-
-    if (unitType === 'infantry') {
-        for (let i = 0; i < 2; i++) {
-            let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares(activeTeam) : [{c: 0, r: 0}];
-            let pos = i === 0 ? spawnPos : (baseSquares.find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r)) || spawnPos);
-            units.push({
-                name: unitName,
-                type: unitCategory,
-                range: unitRange,
-                gridX: pos.c,
-                gridY: pos.r,
-                x: pos.c * currentCellSize,
-                y: pos.r * currentCellSize,
-                img: imgRef,
-                loaded: loadRef,
-                team: activeTeam
-            });
-        }
-        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 2x Infantry via shop!`);
-    } else {
-        units.push({
-            name: unitName,
-            type: unitCategory,
-            range: unitRange,
-            gridX: spawnPos.c,
-            gridY: spawnPos.r,
-            x: spawnPos.c * currentCellSize,
-            y: spawnPos.r * currentCellSize,
-            img: imgRef,
-            loaded: loadRef,
-            team: activeTeam
-        });
-        TeamLog.success(`${activeTeam.toUpperCase()} successfully recruited 1x ${unitName} via shop!`);
-    }
-
+    TeamLog.success(`${activeTeam.toUpperCase()} purchased ${unitType}. Awaiting valid deployment tile selection.`);
     toggleShop();
+}
+
+// Territory & Core Ownership Helper Logic for Valid Deployment Tiles
+function getValidDeploymentTiles(team, unitType) {
+    let validTiles = [];
+
+    goldCores.forEach(core => {
+        let isCoreControlled = (core.owner === team);
+        let isTeamBase = (core.isBase && core.teamBase === team);
+
+        if (unitType === 'infantry') {
+            // Infantry can spawn on team base tiles / base cores and captured Gold Squares linked to team-owned cores
+            if (isCoreControlled || isTeamBase) {
+                if (core.captureZones) {
+                    core.captureZones.forEach(zone => {
+                        validTiles.push({ c: zone.c, r: zone.r });
+                    });
+                }
+                validTiles.push({ c: core.c, r: core.r });
+            }
+        } else {
+            // Tanks, Artillery, Navy (ships/boats) spawn on regional tiles (t, art, nav) whose parent Gold Core is captured by the purchasing team
+            if (isCoreControlled) {
+                if (core.captureZones) {
+                    core.captureZones.forEach(zone => {
+                        validTiles.push({ c: zone.c, r: zone.r });
+                    });
+                }
+                validTiles.push({ c: core.c, r: core.r });
+            }
+        }
+    });
+
+    // Fallback / standard base and port integration if available
+    if (unitType === 'infantry' && typeof getBaseSquares === 'function') {
+        let baseSquares = getBaseSquares(team);
+        if (baseSquares) baseSquares.forEach(b => validTiles.push(b));
+    } else if (unitType === 'ship' && typeof getPortSquare === 'function') {
+        let port = getPortSquare(team);
+        if (port) validTiles.push(port);
+    }
+
+    // Deduplicate coordinate list
+    let uniqueTiles = [];
+    let seen = new Set();
+    validTiles.forEach(t => {
+        let key = `${t.c},${t.r}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueTiles.push(t);
+        }
+    });
+
+    return uniqueTiles;
 }
 
 // Fallback helper stubs for superunits and stalemates if external modules aren't loaded
