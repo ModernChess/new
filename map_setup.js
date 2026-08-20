@@ -22,6 +22,9 @@ window.BOARD_CONFIGS = window.BOARD_CONFIGS || {
 
 window.ACTIVE_BOARD_CONFIG = window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.macro_grid_ay_bv;
 
+// Ensure window.ACTIVE_BOARD_CONFIG has a default fallback object
+window.ACTIVE_BOARD_CONFIG = window.ACTIVE_BOARD_CONFIG || { cols: 24, rows: 34 };
+
 // Use var for global variables to prevent Temporal Dead Zone (TDZ) errors across scripts
 var cols = window.ACTIVE_BOARD_CONFIG.cols;
 var rows = window.ACTIVE_BOARD_CONFIG.rows;
