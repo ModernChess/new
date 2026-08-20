@@ -14,9 +14,9 @@ if (!ctx) {
     console.error("[ERROR][map_setup] Failed to acquire 2D rendering context from canvas.");
 }
 
-// Dynamic grid dimensions and tile size parameters (overwritten on initGameMap)
-let cols = 18;
-let rows = 18;
+// Dynamic grid dimensions and tile size parameters (overwritten on initGameMap) - Updated to Larger Board (24x34)
+let cols = 24;
+let rows = 34;
 let cellSize = canvas ? canvas.width / cols : 30;
 
 // Linear interpolation mathematical utility function for smooth movement/transitions
@@ -71,7 +71,6 @@ const assetUrls = [
 let loadedCount = 0;
 const totalAssets = assetUrls.length;
 
-// Map image variables removed; grid is now procedurally rendered via in-web system
 let mapLoaded = true; 
 
 let blueTankImg = new Image(), blueTankLoaded = false;
@@ -269,10 +268,10 @@ function spawnTeam(team) {
 }
 
 window.initGameMap = function(config) {
-    const boardConfig = config || window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.basic;
+    const boardConfig = config || window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.larger_basic;
 
-    cols = boardConfig.cols || 18;
-    rows = boardConfig.rows || 18;
+    cols = boardConfig.cols || 24;
+    rows = boardConfig.rows || 34;
 
     if (canvas) {
         cellSize = canvas.width / cols;
@@ -287,6 +286,6 @@ window.initGameMap = function(config) {
     console.log(`[SUCCESS][map_setup] Map re-initialized for preset: '${boardConfig.type}' (${cols}x${rows} grid, cellSize: ${cellSize}px).`);
 };
 
-window.initGameMap(window.BOARD_CONFIGS ? window.BOARD_CONFIGS.basic : { cols: 18, rows: 18 });
+window.initGameMap(window.BOARD_CONFIGS ? window.BOARD_CONFIGS.larger_basic : { cols: 24, rows: 34, type: 'larger_basic' });
 
 console.log("[SUCCESS][map_setup] Map setup script loaded with In-Web Grid System successfully.");
