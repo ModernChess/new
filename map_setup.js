@@ -20,12 +20,12 @@ window.BOARD_CONFIGS = window.BOARD_CONFIGS || {
     macro_grid_ay_bv: { cols: 24, rows: 34, type: 'macro_grid_ay_bv', tileSize: 30 }
 };
 
-window.ACTIVE_BOARD_CONFIG = window.BOARD_CONFIGS.macro_grid_ay_bv;
+window.ACTIVE_BOARD_CONFIG = window.ACTIVE_BOARD_CONFIG || window.BOARD_CONFIGS.macro_grid_ay_bv;
 
-// Dynamic grid dimensions and tile size parameters
-let cols = window.ACTIVE_BOARD_CONFIG.cols;
-let rows = window.ACTIVE_BOARD_CONFIG.rows;
-let cellSize = canvas ? canvas.width / cols : window.ACTIVE_BOARD_CONFIG.tileSize;
+// Use var for global variables to prevent Temporal Dead Zone (TDZ) errors across scripts
+var cols = window.ACTIVE_BOARD_CONFIG.cols;
+var rows = window.ACTIVE_BOARD_CONFIG.rows;
+var cellSize = canvas ? (canvas.width / cols) : window.ACTIVE_BOARD_CONFIG.tileSize;
 
 // Linear interpolation mathematical utility function for smooth movement/transitions
 function lerp(start, end, t) {
@@ -78,15 +78,15 @@ const assetUrls = [
 let loadedCount = 0;
 const totalAssets = assetUrls.length;
 
-let blueTankImg = new Image(), blueTankLoaded = false;
-let blueInfantryImg = new Image(), blueInfantryLoaded = false;
-let blueArtilleryImg = new Image(), blueArtilleryLoaded = false;
-let blueShipImg = new Image(), blueShipLoaded = false;
+var blueTankImg = new Image(), blueTankLoaded = false;
+var blueInfantryImg = new Image(), blueInfantryLoaded = false;
+var blueArtilleryImg = new Image(), blueArtilleryLoaded = false;
+var blueShipImg = new Image(), blueShipLoaded = false;
 
-let redTankImg = new Image(), redTankLoaded = false;
-let redInfantryImg = new Image(), redInfantryLoaded = false;
-let redArtilleryImg = new Image(), redArtilleryLoaded = false;
-let redShipImg = new Image(), redShipLoaded = false;
+var redTankImg = new Image(), redTankLoaded = false;
+var redInfantryImg = new Image(), redInfantryLoaded = false;
+var redArtilleryImg = new Image(), redArtilleryLoaded = false;
+var redShipImg = new Image(), redShipLoaded = false;
 
 function updateLoadingProgress() {
     loadedCount++;
@@ -259,7 +259,7 @@ function drawGridMap() {
     }
 }
 
-let units = [];
+var units = [];
 
 function getBaseSquares(team) {
     let squares = [];
