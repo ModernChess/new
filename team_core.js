@@ -45,7 +45,8 @@ function getTeamFromUnit(unit) {
         if (src.includes('blue')) return 'blue';
     }
 
-    let team = unit.gridY < 9 ? 'red' : 'blue';
+    let midRow = typeof rows !== 'undefined' ? rows / 2 : 9;
+    let team = unit.gridY < midRow ? 'red' : 'blue';
     unit._assignedTeam = team;
     return team;
 }
@@ -138,15 +139,15 @@ function buyUnit(unitType) {
     let imgRef, loadRef;
 
     if (activeTeam === 'blue') {
-        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = blueInfantryImg; loadRef = () => blueInfantryLoaded; }
-        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = blueTankImg; loadRef = () => blueTankLoaded; }
-        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = blueArtilleryImg; loadRef = () => blueArtilleryLoaded; }
-        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = blueShipImg; loadRef = () => blueShipLoaded; }
+        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = typeof blueInfantryImg !== 'undefined' ? blueInfantryImg : null; loadRef = () => typeof blueInfantryLoaded !== 'undefined' && blueInfantryLoaded; }
+        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = typeof blueTankImg !== 'undefined' ? blueTankImg : null; loadRef = () => typeof blueTankLoaded !== 'undefined' && blueTankLoaded; }
+        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = typeof blueArtilleryImg !== 'undefined' ? blueArtilleryImg : null; loadRef = () => typeof blueArtilleryLoaded !== 'undefined' && blueArtilleryLoaded; }
+        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = typeof blueShipImg !== 'undefined' ? blueShipImg : null; loadRef = () => typeof blueShipLoaded !== 'undefined' && blueShipLoaded; }
     } else {
-        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = redInfantryImg; loadRef = () => redInfantryLoaded; }
-        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = redTankImg; loadRef = () => redTankLoaded; }
-        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = redArtilleryImg; loadRef = () => redArtilleryLoaded; }
-        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = redShipImg; loadRef = () => redShipLoaded; }
+        if (unitType === 'infantry') { cost = 1; unitName = 'Infantry'; unitRange = 2; imgRef = typeof redInfantryImg !== 'undefined' ? redInfantryImg : null; loadRef = () => typeof redInfantryLoaded !== 'undefined' && redInfantryLoaded; }
+        else if (unitType === 'tank') { cost = 1; unitName = 'Tank'; unitRange = 3; imgRef = typeof redTankImg !== 'undefined' ? redTankImg : null; loadRef = () => typeof redTankLoaded !== 'undefined' && redTankLoaded; }
+        else if (unitType === 'artillery') { cost = 2; unitName = 'Artillery'; unitRange = 2; imgRef = typeof redArtilleryImg !== 'undefined' ? redArtilleryImg : null; loadRef = () => typeof redArtilleryLoaded !== 'undefined' && redArtilleryLoaded; }
+        else if (unitType === 'ship') { cost = 2; unitName = 'Ship'; unitRange = 2; unitCategory = 'water'; imgRef = typeof redShipImg !== 'undefined' ? redShipImg : null; loadRef = () => typeof redShipLoaded !== 'undefined' && redShipLoaded; }
     }
 
     let currentCoins = activeTeam === 'blue' ? blueCoins : redCoins;
@@ -161,9 +162,9 @@ function buyUnit(unitType) {
 
     let spawnPos = null;
     if (unitCategory === 'water') {
-        spawnPos = getPortSquare(activeTeam);
+        spawnPos = typeof getPortSquare === 'function' ? getPortSquare(activeTeam) : {c: 0, r: 0};
     } else {
-        let baseSquares = getBaseSquares(activeTeam);
+        let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares(activeTeam) : [{c: 0, r: 0}];
         let availableBase = baseSquares.filter(b => !units.some(u => u.gridX === b.c && u.gridY === b.r));
         if (availableBase.length > 0) {
             spawnPos = availableBase[0];
@@ -172,17 +173,20 @@ function buyUnit(unitType) {
         }
     }
 
+    let currentCellSize = typeof cellSize !== 'undefined' ? cellSize : 30;
+
     if (unitType === 'infantry') {
         for (let i = 0; i < 2; i++) {
-            let pos = i === 0 ? spawnPos : (getBaseSquares(activeTeam).find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r)) || spawnPos);
+            let baseSquares = typeof getBaseSquares === 'function' ? getBaseSquares(activeTeam) : [{c: 0, r: 0}];
+            let pos = i === 0 ? spawnPos : (baseSquares.find(b => !units.some(u => u.gridX === b.c && u.gridY === b.r)) || spawnPos);
             units.push({
                 name: unitName,
                 type: unitCategory,
                 range: unitRange,
                 gridX: pos.c,
                 gridY: pos.r,
-                x: pos.c * cellSize,
-                y: pos.r * cellSize,
+                x: pos.c * currentCellSize,
+                y: pos.r * currentCellSize,
                 img: imgRef,
                 loaded: loadRef,
                 team: activeTeam
@@ -196,8 +200,8 @@ function buyUnit(unitType) {
             range: unitRange,
             gridX: spawnPos.c,
             gridY: spawnPos.r,
-            x: spawnPos.c * cellSize,
-            y: spawnPos.r * cellSize,
+            x: spawnPos.c * currentCellSize,
+            y: spawnPos.r * currentCellSize,
             img: imgRef,
             loaded: loadRef,
             team: activeTeam
@@ -208,9 +212,28 @@ function buyUnit(unitType) {
     toggleShop();
 }
 
-function drawTeamUIAndFlags() {
-    let now = performance.now();
+// Fallback helper stubs for superunits and stalemates if external modules aren't loaded
+function getSuperunitsForTeamFallback(teamName, unitsList) {
+    if (typeof window.getSuperunitsForTeam === 'function') {
+        return window.getSuperunitsForTeam(teamName, unitsList);
+    }
+    return [];
+}
 
+function isUnitLockedInStalemateFallback(unit, unitsList) {
+    if (typeof window.isUnitLockedInStalemate === 'function') {
+        return window.isUnitLockedInStalemate(unit, unitsList);
+    }
+    return false;
+}
+
+function drawTeamUIAndFlags() {
+    if (typeof ctx === 'undefined' || !ctx || typeof canvas === 'undefined' || !canvas) return;
+
+    let now = performance.now();
+    let currentCellSize = typeof cellSize !== 'undefined' ? cellSize : 30;
+
+    // HUD Display
     ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 2;
@@ -238,14 +261,15 @@ function drawTeamUIAndFlags() {
         return;
     }
 
+    // Render Gold Cores and Flag Animations
     goldCores.forEach(core => {
-        let cx = core.c * cellSize + cellSize / 2;
-        let cy = core.r * cellSize + cellSize / 2;
+        let cx = core.c * currentCellSize + currentCellSize / 2;
+        let cy = core.r * currentCellSize + currentCellSize / 2;
 
         if (core.owner) {
             ctx.fillStyle = core.owner === 'blue' ? '#3498db' : '#e74c3c';
             ctx.beginPath();
-            ctx.arc(cx, cy, cellSize * 0.25, 0, Math.PI * 2);
+            ctx.arc(cx, cy, currentCellSize * 0.25, 0, Math.PI * 2);
             ctx.fill();
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#ffffff';
@@ -257,11 +281,11 @@ function drawTeamUIAndFlags() {
             let duration = 500;
             if (elapsed < duration) {
                 let progress = elapsed / duration;
-                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (cellSize * 1.5);
-                let renderY = cy - (cellSize * 1.5) + dropOffset;
+                let dropOffset = (1 - Math.cos(progress * Math.PI * 0.5)) * (currentCellSize * 1.5);
+                let renderY = cy - (currentCellSize * 1.5) + dropOffset;
 
                 ctx.fillStyle = core.owner === 'blue' ? '#2980b9' : '#c0392b';
-                ctx.fillRect(cx - 4, renderY, 8, cellSize * 0.8);
+                ctx.fillRect(cx - 4, renderY, 8, currentCellSize * 0.8);
                 ctx.fillStyle = '#f1c40f';
                 ctx.beginPath();
                 ctx.moveTo(cx + 4, renderY);
@@ -274,30 +298,31 @@ function drawTeamUIAndFlags() {
         }
     });
 
+    // Superunit Badges Rendering
     let mapCenterX = canvas.width / 2;
     let mapCenterY = canvas.height / 2;
 
     ['blue', 'red'].forEach(teamName => {
-        let suList = getSuperunitsForTeam(teamName, units);
+        let suList = getSuperunitsForTeamFallback(teamName, typeof units !== 'undefined' ? units : []);
         suList.forEach(su => {
             if (su.units.length <= 1 && su.power !== Infinity && !su.isSpecialSuperunit) return;
 
-            let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * cellSize), 0) / su.units.length;
-            let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * cellSize), 0) / su.units.length;
+            let avgX = su.units.reduce((sum, u) => sum + (u.renderX !== undefined ? u.renderX : u.gridX * currentCellSize), 0) / su.units.length;
+            let avgY = su.units.reduce((sum, u) => sum + (u.renderY !== undefined ? u.renderY : u.gridY * currentCellSize), 0) / su.units.length;
 
             if (su.isSpecialSuperunit && su.core) {
-                avgX = (avgX + su.core.c * cellSize) / 2;
-                avgY = (avgY + su.core.r * cellSize) / 2;
+                avgX = (avgX + su.core.c * currentCellSize) / 2;
+                avgY = (avgY + su.core.r * currentCellSize) / 2;
             }
 
-            let unitCenterX = avgX + cellSize / 2;
-            let unitCenterY = avgY + cellSize / 2;
+            let unitCenterX = avgX + currentCellSize / 2;
+            let unitCenterY = avgY + currentCellSize / 2;
 
             let dirX = mapCenterX - unitCenterX;
             let dirY = mapCenterY - unitCenterY;
             let length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
             
-            let significantDistance = cellSize * 1.8;
+            let significantDistance = currentCellSize * 1.8;
             let offsetX = (dirX / length) * significantDistance;
             let offsetY = (dirY / length) * significantDistance;
 
@@ -318,22 +343,24 @@ function drawTeamUIAndFlags() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            let lockedText = su.units.some(u => isUnitLockedInStalemate(u, units)) ? ' 🔒' : '';
+            let activeUnitsList = typeof units !== 'undefined' ? units : [];
+            let lockedText = su.units.some(u => isUnitLockedInStalemateFallback(u, activeUnitsList)) ? ' 🔒' : '';
             ctx.fillText(`${powerDisplay}${lockedText}`, badgeX + 22, badgeY + 12);
         });
     });
 
+    // Destroyed Units Animation Queue
     destroyedUnitsQueue = destroyedUnitsQueue.filter(item => {
         let elapsed = now - item.startTime;
         let progress = elapsed / item.duration;
         if (progress >= 1.0) return false;
 
         let u = item.unit;
-        let rx = u.gridX * cellSize;
-        let ry = u.gridY * cellSize;
+        let rx = u.gridX * currentCellSize;
+        let ry = u.gridY * currentCellSize;
 
         ctx.fillStyle = `rgba(255, 50, 50, ${1 - progress})`;
-        ctx.fillRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
+        ctx.fillRect(rx + 2, ry + 2, currentCellSize - 4, currentCellSize - 4);
         return true;
     });
 }
