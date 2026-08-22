@@ -1,9 +1,10 @@
+
 // =========================================================================
-// IN-GAME OVERLAY CONSOLE & ERROR/SUCCESS TRACKER (HIDDEN)
+// IN-GAME OVERLAY CONSOLE & ERROR/SUCCESS TRACKER (VISIBLE)
 // =========================================================================
 
 (function() {
-    // Create container elements for the in-game console but keep it hidden completely
+    // Create container elements for the in-game console and make it visible
     const consoleContainer = document.createElement('div');
     consoleContainer.id = 'ingame-debug-console';
     consoleContainer.style.cssText = `
@@ -19,7 +20,7 @@
         font-family: monospace;
         font-size: 11px;
         z-index: 99999;
-        display: none;
+        display: flex;
         flex-direction: column;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         pointer-events: auto;
@@ -48,6 +49,15 @@
     toggleBtn.innerText = '_';
     toggleBtn.style.cssText = 'background:#444; color:#fff; border:none; padding:2px 8px; cursor:pointer; font-size:10px; border-radius:3px;';
     
+    let isMinimized = false;
+    toggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        isMinimized = !isMinimized;
+        logContent.style.display = isMinimized ? 'none' : 'flex';
+        consoleContainer.style.height = isMinimized ? '32px' : '200px';
+        toggleBtn.innerText = isMinimized ? '+' : '_';
+    };
+
     controls.appendChild(clearBtn);
     controls.appendChild(toggleBtn);
     headerBar.appendChild(controls);
@@ -67,9 +77,29 @@
     consoleContainer.appendChild(logContent);
     document.body.appendChild(consoleContainer);
 
-    // Keep standard console functionality active in the background without showing the UI overlay
+    // Function to append logs visibly onto the console overlay
     function appendLog(type, args) {
-        // Logs are tracked silently behind the scenes
+        const line = document.createElement('div');
+        line.style.cssText = 'border-bottom: 1px solid #222; padding-bottom: 2px;';
+        
+        if (type === 'error') {
+            line.style.color = '#ff6b6b';
+        } else if (type === 'warn') {
+            line.style.color = '#feca57';
+        } else {
+            line.style.color = '#1dd1a1';
+        }
+
+        const text = args.map(arg => {
+            if (typeof arg === 'object') {
+                try { return JSON.stringify(arg); } catch(e) { return String(arg); }
+            }
+            return String(arg);
+        }).join(' ');
+
+        line.innerText = `[${type.toUpperCase()}] ${text}`;
+        logContent.appendChild(line);
+        logContent.scrollTop = logContent.scrollHeight;
     }
 
     const originalLog = console.log;
