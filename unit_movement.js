@@ -2,19 +2,12 @@
 // UNIT MOVEMENT, INTERACTION, AND RENDERING LOOP CONTROLLER
 // =========================================================================
 
-// Safely declare cellSize and units globally to prevent undefined/TDZ errors
-var cellSize = (typeof window !== 'undefined' && window.cellSize) ? window.cellSize : 30;
-var units = (typeof window !== 'undefined' && window.units) ? window.units : [];
-window.units = units;
-
 let selectedUnit = null;     
 let legalMoves = [];         
 let targetTile = null;       
 let pressTimer = null;       
 let rangeMode = false;
 let rangeSquares = [];
-let lastClickTime = 0;       // Double-click timer tracker for pendingSpawn
-let lastClickTile = null;    // Double-click tile target tracker for pendingSpawn
 
 const SystemLog = {
     info: (msg, data = null) => console.log(`[INFO][unit_movement]: ${msg}`, data ?? ''),
@@ -30,17 +23,16 @@ function validateCoordinates(c, r, maxCols = cols, maxRows = rows) {
 }
 
 function getLargerCoord(c, r) {
-    if (!validateCoordinates(c, r)) return { col: 'A', row: '1', colIdx: 0, rowIdx: 0 };
+    if (!validateCoordinates(c, r)) return { col: 'Al', row: '1l', colIdx: 0, rowIdx: 0 };
 
-    // Updated for the 24x34 board layout (12 macro columns, 17 macro rows)
-    const macroCols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+    const cols_9x9 = ['Al', 'Bl', 'Cl', 'Dl', 'El', 'Fl', 'Gl', 'Hl', 'Il'];
+    const rows_9x9 = ['1l', '2l', '3l', '4l', '5l', '6l', '7l', '8l', '9l'];
     let lc = Math.floor(c / 2);
     let lr = Math.floor(r / 2);
-    
-    if (lc >= macroCols.length) lc = macroCols.length - 1;
-    if (lr >= 17) lr = 16;
+    if (lc >= 9) lc = 8;
+    if (lr >= 9) lr = 8;
 
-    return { col: macroCols[lc], row: (lr + 1).toString(), colIdx: lc, rowIdx: lr };
+    return { col: cols_9x9[lc], row: rows_9x9[lr], colIdx: lc, rowIdx: lr };
 }
 
 function getUnitCombatRange(unit) {
@@ -55,17 +47,14 @@ function getUnitCombatRange(unit) {
         {dx: 0, dy: -1}, {dx: 0, dy: 1},  
         {dx: -1, dy: 0}, {dx: 1, dy: 0},  
         {dx: -1, dy: -1}, {dx: 1, dy: -1}, 
-        {dx: -1, dy: 1}, {dx: 1, dy: 1}    
+        {dx: -1, dy: 1}, {dx: 1, dy: 1}   
     ];
-
-    let maxMacroCols = Math.floor(cols / 2); // 12 for 24 cols
-    let maxMacroRows = Math.floor(rows / 2); // 17 for 34 rows
 
     directions.forEach(dir => {
         for (let step = 1; step <= maxDist; step++) {
             let nc = currentLg.colIdx + (dir.dx * step);
             let nr = currentLg.rowIdx + (dir.dy * step);
-            if (nc >= 0 && nc < maxMacroCols && nr >= 0 && nr < maxMacroRows) {
+            if (nc >= 0 && nc < 9 && nr >= 0 && nr < 9) {
                 results.push({
                     startC: nc * 2, startR: nr * 2,
                     endC: nc * 2 + 1, endR: nr * 2 + 1
@@ -133,57 +122,13 @@ canvas.addEventListener('pointerdown', (e) => {
 
     if (!validateCoordinates(c, r)) return;
 
-    // Intercept pointer events while waiting for a deployment tile placement
-    if (typeof pendingSpawn !== 'undefined' && pendingSpawn !== null) {
-        let validTiles = typeof getValidDeploymentTiles === 'function' 
-            ? getValidDeploymentTiles(pendingSpawn.team, pendingSpawn.unitType) 
-            : [];
-        let isValid = validTiles.some(t => t.c === c && t.r === r);
-
-        if (isValid) {
-            let nowTime = performance.now();
-            if (lastClickTile && lastClickTile.c === c && lastClickTile.r === r && (nowTime - lastClickTime) < 400) {
-                // Double-click confirmed on valid deployment tile
-                let occupied = units.some(u => u.gridX === c && u.gridY === r);
-                if (!occupied) {
-                    let currentCellSize = typeof cellSize !== 'undefined' ? cellSize : 30;
-                    
-                    units.push({
-                        name: pendingSpawn.unitName,
-                        type: pendingSpawn.category,
-                        range: pendingSpawn.unitRange,
-                        gridX: c,
-                        gridY: r,
-                        x: c * currentCellSize,
-                        y: r * currentCellSize,
-                        img: pendingSpawn.img,
-                        loaded: pendingSpawn.loaded,
-                        team: pendingSpawn.team
-                    });
-
-                    SystemLog.success(`Successfully deployed ${pendingSpawn.unitName} for ${pendingSpawn.team.toUpperCase()} at (${c}, ${r}).`);
-                    pendingSpawn = null;
-                    lastClickTime = 0;
-                    lastClickTile = null;
-                } else {
-                    SystemLog.warn(`Deployment tile (${c}, ${r}) is already occupied.`);
-                }
-            } else {
-                lastClickTime = nowTime;
-                lastClickTile = { c: c, r: r };
-            }
-        } else {
-            SystemLog.warn(`Selected tile (${c}, ${r}) is outside valid deployment territory.`);
-        }
-        return;
-    }
-
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
         let clickedUnit = units.find(u => u.gridX === c && u.gridY === r);
 
         if (clickedUnit) {
             let unitTeam = getTeamFromUnit(clickedUnit);
             
+            // If we are in rangeMode and selected an enemy unit with an Artillery piece, trigger the card duel!
             if (selectedUnit && rangeMode && (selectedUnit.name || '').includes('Artillery')) {
                 let attackerTeam = getTeamFromUnit(selectedUnit);
                 if (unitTeam !== attackerTeam) {
@@ -250,8 +195,8 @@ canvas.addEventListener('pointercancel', () => { if (pressTimer) { clearTimeout(
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (typeof drawGridMap === 'function') {
-        drawGridMap();
+    if (mapLoaded) {
+        ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
     } else {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -259,20 +204,6 @@ function update() {
 
     if (typeof drawTeamUIAndFlags === 'function') {
         drawTeamUIAndFlags();
-    }
-
-    // Deployment Outline Overlay pass while pendingSpawn is active
-    if (typeof pendingSpawn !== 'undefined' && pendingSpawn !== null) {
-        let validTiles = typeof getValidDeploymentTiles === 'function' 
-            ? getValidDeploymentTiles(pendingSpawn.team, pendingSpawn.unitType) 
-            : [];
-        ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 3.5;
-        validTiles.forEach(tile => {
-            let px = tile.c * cellSize;
-            let py = tile.r * cellSize;
-            ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
-        });
     }
 
     units.forEach(u => {
@@ -346,5 +277,5 @@ function update() {
     requestAnimationFrame(update);
 }
 
-SystemLog.info('Unit movement controller updated successfully for the 24x34 larger board.');
+SystemLog.info('Unit movement controller updated successfully with Artillery Card Duel hooks.');
 update();
